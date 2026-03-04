@@ -1,0 +1,46 @@
+# Build folders
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+
+# VS Code
+.vscode/
+
+# MAUI específicos
+*.apk
+*.aab
+*.ipa
+*.app
+
+# Android
+*.keystore
+*.jks
+
+# iOS
+*.mobileprovision
+
+# Logs
+*.log
+
+# NuGet
+packages/
+*.nupkg
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Configuración sensible
+appsettings.Development.json
+appsettings.Local.json
