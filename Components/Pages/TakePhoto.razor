@@ -1,0 +1,215 @@
+﻿@using ReportPackaging.Services
+
+<h3>TakePhoto</h3>
+
+@code {
+	private async void OnTakePhotoClicked(object sender, EventArgs e)
+	{
+
+		try
+		{
+			//Configuracion de la camar
+			AppSettingsLoader.Load();
+
+			var azureEndpoint = AppSettings.Current.AzureComputerVision.Endpoint;
+			var endpoint = AppSettings.Current.AzureComputerVision.Endpoint;
+			var apiKey = AppSettings.Current.AzureComputerVision.Key;
+			// var mistralKey = AppSettings.Current.MistralApiKey;
+
+			if (!MediaPicker.Default.IsCaptureSupported)
+			{
+				return;
+
+			}
+
+			var photo = await MediaPicker.Default.CapturePhotoAsync();
+
+
+
+			if (photo == null)
+			{
+
+				return;
+
+			}
+
+			//preguntar al user que inteligencia artificial desea utiliazr
+			string action = await DisplayActionSheet("Seleccionar Motor IA", "Cancelar", null, "Azure AI", "Mistral AI");
+
+			if (action == "Cancelar" || string.IsNullOrEmpty(action))
+			{
+				return;
+			
+			}
+
+
+			//se activa la animacion de carga
+
+			LoadingOverlay.IsVisible = true;
+
+
+			using var stream = await photo.OpenReadAsync();
+			InvoiceData invoiceData = null;
+			
+
+			using var memoryStream = new MemoryStream();
+
+			await stream.CopyToAsync(memoryStream);
+			memoryStream.Position = 0;
+
+
+			if (action == "Azure AI")
+			{
+
+				var ocrService = new AzureOcrService(endpoint, apiKey);
+				invoiceData = await ocrService.AnalyzeInvoiceAsync(memoryStream);
+			}
+
+			// if (action== "Mistral AI") {
+			// 	var mistralService = new MistralOcrService(mistralKey);
+			// 	invoiceData = await mistralService.AnalyzeInvoiceAsync(stream);
+			
+			// }
+
+			//INTERCEPTORES PARA EVITAR QUE EL SUARIO COMETA ALGUN ERROR O LE FALTE ALGO
+
+			//A.    Validar numero de la factur
+			string finalInvoiceNo = invoiceData.InvoiceNumber?.ToString();
+			if (string.IsNullOrEmpty(finalInvoiceNo))
+			{
+
+				string foundInText = TryExtractGuatemalanInvoiceId(invoiceData.Content);
+
+				if (!string.IsNullOrEmpty(foundInText))
+				{
+					finalInvoiceNo = foundInText;
+				}
+				else
+				{
+					//si falla se p[ide entrada manual
+					finalInvoiceNo = await DisplayPromptAsync("Faltan Datos", "No se detecto el numero de factura. Porfabor ingreselo manualmente", initialValue: "S/N");
+					if (string.IsNullOrEmpty(finalInvoiceNo))
+					{
+						return;
+					}
+					LoadingOverlay.IsVisible = true;
+
+				}
+
+
+			}
+
+			//B. Validar la moneda , se buscan pistas para ver que onda
+			// ya nos se pregunta que currency es string action = await DisplayActionSheet($"Factura: {finalInvoiceNo}. Que moneda es?","Cancelar",null,"Quetzales (Q)","Dolares {$}");
+
+			string currenSelection = ComboCurrency.SelectedItem?.ToString() ?? "";
+			string detectedCurrency = currenSelection.Contains("$") ? "$" : "Q";
+
+			_currentCurrencySymbol = detectedCurrency;
+
+			//Procesamiento de items
+			if (invoiceData.LineItems != null && invoiceData.LineItems.Count > 0)
+			{
+				int agregados = 0;
+				foreach (var item in invoiceData.LineItems)
+				{
+
+					decimal qty = item.Quantity > 0 ? item.Quantity : 1;
+					decimal total = item.TotalAmount;
+					decimal unitPrice = item.UnitPrice;
+					//Esto peude causar incosisterncias
+
+
+					//Si el total es 0
+
+					//si el total es 0 pero hay cantida dy preci
+					if (total == 0 && unitPrice > 0) total = unitPrice * qty;
+					//Si el precio es 0 pero se tiene el total
+					if (unitPrice == 0 && total > 0) unitPrice = total / qty;
+
+
+					//Si ambos son 0, se pone pendiente
+					if (total == 0) continue;
+
+					var nuevoItem = new FacturaDisplay
+					{
+
+						Date = invoiceData.InvoiceDate ?? DateTime.Now,
+						InvoiceNumber = finalInvoiceNo,
+						Description = !string.IsNullOrEmpty(item.Description) ? item.Description : "Item sin descripcion",
+
+						Quantity = (int)qty,
+						UnitPrice = unitPrice,
+						Amount = total,
+
+						AccountingAccount = "Pendiente",//osea que se debe de edditar
+						Etc = "",
+						CurrencySymbol = _currentCurrencySymbol
+
+
+					};
+
+					TempFacturas.Add(nuevoItem);
+					agregados++;
+
+
+				}
+				//Se coutla el loading al terminar
+				LoadingOverlay.IsVisible = false;
+
+				if (agregados > 0)
+				{
+					await DisplayAlert("Exito", $"Se agregaron {agregados} items. \n Revisa los que dicen 'Pendiente' toncandolos", "OK");
+
+
+				}
+				else
+				{
+					await DisplayAlert("Aviso", "El analizis detecto items pero todos tenain valor 0", "OK");
+
+				}
+
+			}
+			else if (invoiceData.TotalAmount > 0)
+			{
+
+				LoadingOverlay.IsVisible = false;
+
+
+				//CASO TOTAL GLOBAL
+				LimpiarPopup();
+
+				DetailInvoice.Text = finalInvoiceNo;
+				DetailDate.Date = invoiceData.InvoiceDate ?? DateTime.Now;
+				DetailDesc.Text = !string.IsNullOrEmpty(invoiceData.VendorName) ? $"Compra en {invoiceData.VendorName}" : "Compra General";
+
+				DetailQty.Text = "1";
+				DetailAmount.Text = invoiceData.TotalAmount.ToString("0.00");
+				DetailPrice.Text = invoiceData.TotalAmount.ToString("0.00");
+
+
+
+				PopupOverlay.IsVisible = true;
+				await DisplayAlert("Atencion", $"Se detecto un total de {detectedCurrency}{invoiceData.TotalAmount:N2}.", "OK");
+
+
+
+			}
+
+
+
+
+		}
+		catch (Exception ex)
+		{
+			LoadingOverlay.IsVisible = false;
+			await DisplayAlert("Exito", $"Fallo al procesar: {ex.Message}", "OK");
+		}
+		finally
+		{
+		
+			if (LoadingOverlay.IsVisible) LoadingOverlay.IsVisible = false;
+		}
+
+	}
+}

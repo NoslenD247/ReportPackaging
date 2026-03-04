@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace ReportPackaging
 {
@@ -19,6 +20,8 @@ namespace ReportPackaging
 #if DEBUG
     		builder.Services.AddBlazorWebViewDeveloperTools();
     		builder.Logging.AddDebug();
+
+            builder.Configuration.AddJsonFile("appsettings.json");
 #endif
 
             return builder.Build();

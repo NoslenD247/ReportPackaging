@@ -42,5 +42,6 @@ packages/
 Thumbs.db
 
 # Configuración sensible
+appsettings.json
 appsettings.Development.json
 appsettings.Local.json

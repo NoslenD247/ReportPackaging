@@ -1,3 +1,5 @@
 <Solution>
-  <Project Path="ReportPackaging.csproj" />
+  <Project Path="ReportPackaging.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
 </Solution>
