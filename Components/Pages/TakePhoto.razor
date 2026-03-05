@@ -1,215 +1,248 @@
-﻿@using ReportPackaging.Services
+﻿@page "/take-photo"
 
-<h3>TakePhoto</h3>
+
+@using ReportPackaging.Services
+@using System.Text.Json
+
+<div style="padding: 20px; font-family: sans-serif; max-width: 100%;">
+
+    <h3>📷 Escanear Reporte</h3>
+
+    <!-- Botones de captura -->
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+        <button @onclick="OnTakePhotoClicked" disabled="@isLoading"
+                style="background:#0078d4; color:white; padding:12px 20px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
+            📷 Tomar Foto
+        </button>
+        <button @onclick="OnPickPhotoClicked" disabled="@isLoading"
+                style="background:#107c41; color:white; padding:12px 20px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
+            🖼️ Subir Imagen
+        </button>
+    </div>
+
+    <!-- Loading -->
+    @if (isLoading)
+    {
+        <div style="padding:16px; background:#fff8e1; border-radius:8px; color:#7a5c00; margin-bottom:16px;">
+            ⏳ Procesando imagen con Mistral AI, espera un momento...
+        </div>
+    }
+
+    <!-- Error -->
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="padding:12px; background:#fde8e8; border:1px solid #f44336; border-radius:8px; color:#c00; margin-bottom:16px;">
+            ❌ @errorMessage
+        </div>
+    }
+
+    <!-- Tabla editable -->
+    @if (rows.Count > 0)
+    {
+        <div style="margin-top:10px;">
+            <h4>✅ @rows.Count fila(s) detectadas — edita si es necesario</h4>
+
+            <!-- Scroll horizontal para la tabla -->
+            <div style="overflow-x:auto; border:1px solid #ddd; border-radius:8px;">
+                <table style="border-collapse:collapse; width:100%; min-width:1200px; font-size:13px;">
+                    <thead>
+                        <tr style="background:#0078d4; color:white;">
+                            <th style="@thStyle">Fecha</th>
+                            <th style="@thStyle">Código</th>
+                            <th style="@thStyle">Buyer</th>
+                            <th style="@thStyle">Style</th>
+                            <th style="@thStyle">PO#</th>
+                            <th style="@thStyle">Color</th>
+                            <th style="@thStyle">Orden</th>
+                            <th style="@thStyle">XS</th>
+                            <th style="@thStyle">S</th>
+                            <th style="@thStyle">M</th>
+                            <th style="@thStyle">L</th>
+                            <th style="@thStyle">XL</th>
+                            <th style="@thStyle">2XL</th>
+                            <th style="@thStyle">3XL</th>
+                            <th style="@thStyle">Total Hoy</th>
+                            <th style="@thStyle">Acumulado</th>
+                            <th style="@thStyle">Balance</th>
+                            <th style="@thStyle">🗑️</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in rows)
+                        {
+                            var r = row; // captura local para el loop
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Fecha" /></td>
+                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Codigo" /></td>
+                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Buyer" /></td>
+                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Style" /></td>
+                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.PO" /></td>
+                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Color" /></td>
+                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Orden" /></td>
+                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.XS" /></td>
+                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.S" /></td>
+                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.M" /></td>
+                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.L" /></td>
+                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.XL" /></td>
+                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.XL2" /></td>
+                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.XL3" /></td>
+                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.TotalHoy" /></td>
+                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.Acumulado" /></td>
+                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.Balance" /></td>
+                                <td style="@tdStyle; text-align:center;">
+                                    <button @onclick="() => EliminarFila(r)"
+                                            style="background:none; border:none; color:#e53935; font-size:16px; cursor:pointer;">
+                                        🗑️
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Botones de acción -->
+            <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+                <button @onclick="AgregarFila"
+                        style="background:#6c757d; color:white; padding:10px 18px; border:none; border-radius:8px; cursor:pointer;">
+                    ➕ Agregar Fila
+                </button>
+                <button @onclick="GuardarDatos" disabled="@isGuardando"
+                        style="background:#28a745; color:white; padding:10px 24px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
+                    💾 @(isGuardando ? "Guardando..." : "Guardar en DB")
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(mensajeGuardado))
+            {
+                <div style="margin-top:12px; padding:12px; background:#e8f5e9; border-radius:8px; color:#2e7d32;">
+                    ✅ @mensajeGuardado
+                </div>
+            }
+        </div>
+    }
+
+</div>
 
 @code {
-	private async void OnTakePhotoClicked(object sender, EventArgs e)
-	{
 
-		try
-		{
-			//Configuracion de la camar
-			AppSettingsLoader.Load();
-
-			var azureEndpoint = AppSettings.Current.AzureComputerVision.Endpoint;
-			var endpoint = AppSettings.Current.AzureComputerVision.Endpoint;
-			var apiKey = AppSettings.Current.AzureComputerVision.Key;
-			// var mistralKey = AppSettings.Current.MistralApiKey;
-
-			if (!MediaPicker.Default.IsCaptureSupported)
-			{
-				return;
-
-			}
-
-			var photo = await MediaPicker.Default.CapturePhotoAsync();
-
-
-
-			if (photo == null)
-			{
-
-				return;
-
-			}
-
-			//preguntar al user que inteligencia artificial desea utiliazr
-			string action = await DisplayActionSheet("Seleccionar Motor IA", "Cancelar", null, "Azure AI", "Mistral AI");
-
-			if (action == "Cancelar" || string.IsNullOrEmpty(action))
-			{
-				return;
-			
-			}
-
-
-			//se activa la animacion de carga
-
-			LoadingOverlay.IsVisible = true;
-
-
-			using var stream = await photo.OpenReadAsync();
-			InvoiceData invoiceData = null;
-			
-
-			using var memoryStream = new MemoryStream();
-
-			await stream.CopyToAsync(memoryStream);
-			memoryStream.Position = 0;
-
-
-			if (action == "Azure AI")
-			{
-
-				var ocrService = new AzureOcrService(endpoint, apiKey);
-				invoiceData = await ocrService.AnalyzeInvoiceAsync(memoryStream);
-			}
-
-			// if (action== "Mistral AI") {
-			// 	var mistralService = new MistralOcrService(mistralKey);
-			// 	invoiceData = await mistralService.AnalyzeInvoiceAsync(stream);
-			
-			// }
-
-			//INTERCEPTORES PARA EVITAR QUE EL SUARIO COMETA ALGUN ERROR O LE FALTE ALGO
-
-			//A.    Validar numero de la factur
-			string finalInvoiceNo = invoiceData.InvoiceNumber?.ToString();
-			if (string.IsNullOrEmpty(finalInvoiceNo))
-			{
-
-				string foundInText = TryExtractGuatemalanInvoiceId(invoiceData.Content);
-
-				if (!string.IsNullOrEmpty(foundInText))
-				{
-					finalInvoiceNo = foundInText;
-				}
-				else
-				{
-					//si falla se p[ide entrada manual
-					finalInvoiceNo = await DisplayPromptAsync("Faltan Datos", "No se detecto el numero de factura. Porfabor ingreselo manualmente", initialValue: "S/N");
-					if (string.IsNullOrEmpty(finalInvoiceNo))
-					{
-						return;
-					}
-					LoadingOverlay.IsVisible = true;
-
-				}
-
-
-			}
-
-			//B. Validar la moneda , se buscan pistas para ver que onda
-			// ya nos se pregunta que currency es string action = await DisplayActionSheet($"Factura: {finalInvoiceNo}. Que moneda es?","Cancelar",null,"Quetzales (Q)","Dolares {$}");
-
-			string currenSelection = ComboCurrency.SelectedItem?.ToString() ?? "";
-			string detectedCurrency = currenSelection.Contains("$") ? "$" : "Q";
-
-			_currentCurrencySymbol = detectedCurrency;
-
-			//Procesamiento de items
-			if (invoiceData.LineItems != null && invoiceData.LineItems.Count > 0)
-			{
-				int agregados = 0;
-				foreach (var item in invoiceData.LineItems)
-				{
-
-					decimal qty = item.Quantity > 0 ? item.Quantity : 1;
-					decimal total = item.TotalAmount;
-					decimal unitPrice = item.UnitPrice;
-					//Esto peude causar incosisterncias
-
-
-					//Si el total es 0
-
-					//si el total es 0 pero hay cantida dy preci
-					if (total == 0 && unitPrice > 0) total = unitPrice * qty;
-					//Si el precio es 0 pero se tiene el total
-					if (unitPrice == 0 && total > 0) unitPrice = total / qty;
-
-
-					//Si ambos son 0, se pone pendiente
-					if (total == 0) continue;
-
-					var nuevoItem = new FacturaDisplay
-					{
-
-						Date = invoiceData.InvoiceDate ?? DateTime.Now,
-						InvoiceNumber = finalInvoiceNo,
-						Description = !string.IsNullOrEmpty(item.Description) ? item.Description : "Item sin descripcion",
-
-						Quantity = (int)qty,
-						UnitPrice = unitPrice,
-						Amount = total,
-
-						AccountingAccount = "Pendiente",//osea que se debe de edditar
-						Etc = "",
-						CurrencySymbol = _currentCurrencySymbol
-
-
-					};
-
-					TempFacturas.Add(nuevoItem);
-					agregados++;
-
-
-				}
-				//Se coutla el loading al terminar
-				LoadingOverlay.IsVisible = false;
-
-				if (agregados > 0)
-				{
-					await DisplayAlert("Exito", $"Se agregaron {agregados} items. \n Revisa los que dicen 'Pendiente' toncandolos", "OK");
-
-
-				}
-				else
-				{
-					await DisplayAlert("Aviso", "El analizis detecto items pero todos tenain valor 0", "OK");
-
-				}
-
-			}
-			else if (invoiceData.TotalAmount > 0)
-			{
-
-				LoadingOverlay.IsVisible = false;
-
-
-				//CASO TOTAL GLOBAL
-				LimpiarPopup();
-
-				DetailInvoice.Text = finalInvoiceNo;
-				DetailDate.Date = invoiceData.InvoiceDate ?? DateTime.Now;
-				DetailDesc.Text = !string.IsNullOrEmpty(invoiceData.VendorName) ? $"Compra en {invoiceData.VendorName}" : "Compra General";
-
-				DetailQty.Text = "1";
-				DetailAmount.Text = invoiceData.TotalAmount.ToString("0.00");
-				DetailPrice.Text = invoiceData.TotalAmount.ToString("0.00");
-
-
-
-				PopupOverlay.IsVisible = true;
-				await DisplayAlert("Atencion", $"Se detecto un total de {detectedCurrency}{invoiceData.TotalAmount:N2}.", "OK");
-
-
-
-			}
-
-
-
-
-		}
-		catch (Exception ex)
-		{
-			LoadingOverlay.IsVisible = false;
-			await DisplayAlert("Exito", $"Fallo al procesar: {ex.Message}", "OK");
-		}
-		finally
-		{
-		
-			if (LoadingOverlay.IsVisible) LoadingOverlay.IsVisible = false;
-		}
-
-	}
+    // ── Estado ──────────────────────────────────────────
+    private bool isLoading = false;
+    private bool isGuardando = false;
+    private string errorMessage = string.Empty;
+    private string mensajeGuardado = string.Empty;
+    private List<ReportRow> rows = new();
+
+    // ── Estilos inline reutilizables ────────────────────
+    private string thStyle = "padding:8px 10px; text-align:left; white-space:nowrap;";
+    private string tdStyle = "padding:4px 6px;";
+    private string inputStyle = "width:90px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:12px;";
+    private string inputStyleNum = "width:60px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:12px; text-align:right;";
+
+    // ── Tomar foto ──────────────────────────────────────
+    private async Task OnTakePhotoClicked()
+    {
+        if (!MediaPicker.Default.IsCaptureSupported)
+        {
+            errorMessage = "Este dispositivo no soporta cámara.";
+            return;
+        }
+        var photo = await MediaPicker.Default.CapturePhotoAsync();
+        if (photo == null) return;
+        await ProcesarFoto(photo);
+    }
+
+    // ── Subir imagen ────────────────────────────────────
+    private async Task OnPickPhotoClicked()
+    {
+        var photo = await MediaPicker.Default.PickPhotoAsync();
+        if (photo == null) return;
+        await ProcesarFoto(photo);
+    }
+
+    // ── Lógica compartida de procesamiento ──────────────
+    private async Task ProcesarFoto(FileResult photo)
+    {
+        try
+        {
+            errorMessage = string.Empty;
+            mensajeGuardado = string.Empty;
+            rows = new();
+            isLoading = true;
+            StateHasChanged();
+
+            AppSettingsLoader.Load();
+            var mistralKey = AppSettings.Current.MistralApiKey;
+
+            if (string.IsNullOrWhiteSpace(mistralKey))
+            {
+                errorMessage = "No se encontró la Mistral API Key en appsettings.json.";
+                return;
+            }
+
+            using var stream = await photo.OpenReadAsync();
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            var mistralService = new MistralOcrService(mistralKey);
+            var reportData = await mistralService.AnalyzeReportAsync(memoryStream);
+
+            rows = reportData.Rows;
+
+            if (rows.Count == 0)
+                errorMessage = "No se detectaron filas. Intenta con mejor iluminación o una imagen más nítida.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"[TakePhoto] {ex}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    // ── Eliminar fila ───────────────────────────────────
+    private void EliminarFila(ReportRow row)
+    {
+        rows.Remove(row);
+    }
+
+    // ── Agregar fila vacía ──────────────────────────────
+    private void AgregarFila()
+    {
+        rows.Add(new ReportRow());
+    }
+
+    // ── Guardar en DB ───────────────────────────────────
+    private async Task GuardarDatos()
+    {
+        try
+        {
+            isGuardando = true;
+            mensajeGuardado = string.Empty;
+            StateHasChanged();
+
+            // TODO: aquí conectas tu DB
+            // Por ahora simula el guardado
+            await Task.Delay(800);
+
+            // Aquí irá algo como:
+            // await _dbService.GuardarReporte(rows);
+
+            mensajeGuardado = $"{rows.Count} fila(s) guardadas correctamente.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al guardar: {ex.Message}";
+        }
+        finally
+        {
+            isGuardando = false;
+            StateHasChanged();
+        }
+    }
 }
