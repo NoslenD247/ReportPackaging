@@ -21,7 +21,7 @@ namespace ReportPackaging
     		builder.Services.AddBlazorWebViewDeveloperTools();
     		builder.Logging.AddDebug();
 
-            builder.Configuration.AddJsonFile("appsettings.json");
+            //builder.Configuration.AddJsonFile("appsettings.json");
 #endif
 
             return builder.Build();
