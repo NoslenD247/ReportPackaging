@@ -172,11 +172,12 @@
             StateHasChanged();
 
             AppSettingsLoader.Load();
-            var mistralKey = AppSettings.Current.MistralApiKey;
+            var endpoint = AppSettings.Current.AzureComputerVision.Endpoint;
+            var apiKey = AppSettings.Current.AzureComputerVision.Key;
 
-            if (string.IsNullOrWhiteSpace(mistralKey))
+            if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(apiKey))
             {
-                errorMessage = "No se encontró la Mistral API Key en appsettings.json.";
+                errorMessage = "No se encontró el Endpoint o Key de Azure en appsettings.json.";
                 return;
             }
 
@@ -185,18 +186,17 @@
             await stream.CopyToAsync(memoryStream);
             memoryStream.Position = 0;
 
-            var mistralService = new MistralOcrService(mistralKey);
-            var reportData = await mistralService.AnalyzeReportAsync(memoryStream);
+            var azureService = new AzureOcrService(endpoint, apiKey);
+            var reportData = await azureService.AnalyzeReportAsync(memoryStream);
 
             rows = reportData.Rows;
 
             if (rows.Count == 0)
-                errorMessage = "No se detectaron filas. Intenta con mejor iluminación o una imagen más nítida.";
+                errorMessage = "No se detectaron filas. Intenta con mejor iluminación.";
         }
         catch (Exception ex)
         {
             errorMessage = $"Error: {ex.Message}";
-            System.Diagnostics.Debug.WriteLine($"[TakePhoto] {ex}");
         }
         finally
         {
