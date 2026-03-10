@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using static ReportPackaging.Services.AppSettingsLoader;
 
 namespace ReportPackaging.Services
 {
@@ -11,6 +12,7 @@ namespace ReportPackaging.Services
 
         //Haora para poder conectar el mistral 
         public string MistralApiKey { get; set; }
+        public ApiSettingsConfig ApiSettings { get; set; } = new ApiSettingsConfig();
         public static AppSettings Current { get; internal set; } = new AppSettings();
     }
 
@@ -192,6 +194,12 @@ namespace ReportPackaging.Services
             {
                 return null;
             }
+        }
+
+        public class ApiSettingsConfig
+        {
+            public string BaseUrl { get; set; } = string.Empty;
+            public string TestUrl { get; set; } = string.Empty;
         }
     }
 }
