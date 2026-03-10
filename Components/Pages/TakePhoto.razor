@@ -1,15 +1,19 @@
 ﻿@page "/take-photo"
 
-
 @using ReportPackaging.Services
+@using ReportPackaging.Data.Sew.IService
+@using ReportPackaging.Data.Sew.Service
+@using ReportPackaging.Data.Sew.DTO
+
 @using System.Text.Json
 
-<div style="padding: 20px; font-family: sans-serif; max-width: 100%;">
+@inject ITempPackingService TempPackingService;
+<div style="font-family: sans-serif; max-width: 100%;">
 
     <h3>📷 Escanear Reporte</h3>
 
     <!-- Botones de captura -->
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:25px;">
         <button @onclick="OnTakePhotoClicked" disabled="@isLoading"
                 style="background:#0078d4; color:white; padding:12px 20px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
             📷 Tomar Foto
@@ -24,7 +28,7 @@
     @if (isLoading)
     {
         <div style="padding:16px; background:#fff8e1; border-radius:8px; color:#7a5c00; margin-bottom:16px;">
-            ⏳ Procesando imagen con Mistral AI, espera un momento...
+            ⏳ Procesando imagen, espera un momento...
         </div>
     }
 
@@ -42,53 +46,26 @@
         <div style="margin-top:10px;">
             <h4>✅ @rows.Count fila(s) detectadas — edita si es necesario</h4>
 
-            <!-- Scroll horizontal para la tabla -->
             <div style="overflow-x:auto; border:1px solid #ddd; border-radius:8px;">
-                <table style="border-collapse:collapse; width:100%; min-width:1200px; font-size:13px;">
+                <table style="border-collapse:collapse; width:100%; font-size:13px;">
                     <thead>
                         <tr style="background:#0078d4; color:white;">
-                            <th style="@thStyle">Fecha</th>
-                            <th style="@thStyle">Código</th>
                             <th style="@thStyle">Buyer</th>
                             <th style="@thStyle">Style</th>
                             <th style="@thStyle">PO#</th>
                             <th style="@thStyle">Color</th>
-                            <th style="@thStyle">Orden</th>
-                            <th style="@thStyle">XS</th>
-                            <th style="@thStyle">S</th>
-                            <th style="@thStyle">M</th>
-                            <th style="@thStyle">L</th>
-                            <th style="@thStyle">XL</th>
-                            <th style="@thStyle">2XL</th>
-                            <th style="@thStyle">3XL</th>
-                            <th style="@thStyle">Total Hoy</th>
-                            <th style="@thStyle">Acumulado</th>
-                            <th style="@thStyle">Balance</th>
                             <th style="@thStyle">🗑️</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var row in rows)
                         {
-                            var r = row; // captura local para el loop
+                            var r = row;
                             <tr style="border-bottom:1px solid #eee;">
-                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Fecha" /></td>
-                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Codigo" /></td>
                                 <td style="@tdStyle"><input style="@inputStyle" @bind="r.Buyer" /></td>
                                 <td style="@tdStyle"><input style="@inputStyle" @bind="r.Style" /></td>
                                 <td style="@tdStyle"><input style="@inputStyle" @bind="r.PO" /></td>
                                 <td style="@tdStyle"><input style="@inputStyle" @bind="r.Color" /></td>
-                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Orden" /></td>
-                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.XS" /></td>
-                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.S" /></td>
-                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.M" /></td>
-                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.L" /></td>
-                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.XL" /></td>
-                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.XL2" /></td>
-                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.XL3" /></td>
-                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.TotalHoy" /></td>
-                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.Acumulado" /></td>
-                                <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.Balance" /></td>
                                 <td style="@tdStyle; text-align:center;">
                                     <button @onclick="() => EliminarFila(r)"
                                             style="background:none; border:none; color:#e53935; font-size:16px; cursor:pointer;">
@@ -126,20 +103,17 @@
 
 @code {
 
-    // ── Estado ──────────────────────────────────────────
     private bool isLoading = false;
     private bool isGuardando = false;
     private string errorMessage = string.Empty;
     private string mensajeGuardado = string.Empty;
     private List<ReportRow> rows = new();
 
-    // ── Estilos inline reutilizables ────────────────────
     private string thStyle = "padding:8px 10px; text-align:left; white-space:nowrap;";
     private string tdStyle = "padding:4px 6px;";
     private string inputStyle = "width:90px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:12px;";
     private string inputStyleNum = "width:60px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:12px; text-align:right;";
 
-    // ── Tomar foto ──────────────────────────────────────
     private async Task OnTakePhotoClicked()
     {
         if (!MediaPicker.Default.IsCaptureSupported)
@@ -152,7 +126,6 @@
         await ProcesarFoto(photo);
     }
 
-    // ── Subir imagen ────────────────────────────────────
     private async Task OnPickPhotoClicked()
     {
         var photo = await MediaPicker.Default.PickPhotoAsync();
@@ -160,7 +133,6 @@
         await ProcesarFoto(photo);
     }
 
-    // ── Lógica compartida de procesamiento ──────────────
     private async Task ProcesarFoto(FileResult photo)
     {
         try
@@ -205,35 +177,51 @@
         }
     }
 
-    // ── Eliminar fila ───────────────────────────────────
-    private void EliminarFila(ReportRow row)
-    {
-        rows.Remove(row);
-    }
+    private void EliminarFila(ReportRow row) => rows.Remove(row);
 
-    // ── Agregar fila vacía ──────────────────────────────
-    private void AgregarFila()
-    {
-        rows.Add(new ReportRow());
-    }
+    private void AgregarFila() => rows.Add(new ReportRow());
 
-    // ── Guardar en DB ───────────────────────────────────
     private async Task GuardarDatos()
     {
         try
         {
             isGuardando = true;
             mensajeGuardado = string.Empty;
+            errorMessage = string.Empty;
             StateHasChanged();
 
-            // TODO: aquí conectas tu DB
-            // Por ahora simula el guardado
-            await Task.Delay(800);
+            int guardados = 0;
+            int fallidos = 0;
 
-            // Aquí irá algo como:
-            // await _dbService.GuardarReporte(rows);
+            foreach (var row in rows)
+            {
+                // Mapear ReportRow → Sew_TempPackingDTO
+                var dto = new TempPackingDTO
+                {
+                    Buyer = row.Buyer ?? string.Empty,
+                    Style = row.Style ?? string.Empty,
+                    Po = row.PO ?? string.Empty,
+                    Color = row.Color ?? string.Empty,
+                    Orden = row.Orden ?? string.Empty,
+                    Xs = (int)row.XS,
+                    S = (int)row.S,
+                    M = (int)row.M,
+                    L = (int)row.L,
+                    Xl = (int)row.XL,
+                    Xl2 = (int)row.XL2,
+                    Xl3 = (int)row.XL3,
+                    TodayTotal = (int)row.TotalHoy
+                };
 
-            mensajeGuardado = $"{rows.Count} fila(s) guardadas correctamente.";
+                var ok = await TempPackingService.InsertAsync(dto);
+                if (ok) guardados++;
+                else fallidos++;
+            }
+
+            if (fallidos == 0)
+                mensajeGuardado = $"✅ {guardados} fila(s) guardadas correctamente.";
+            else
+                mensajeGuardado = $"⚠️ {guardados} guardadas, {fallidos} fallidas. Revisa tu conexión.";
         }
         catch (Exception ex)
         {
