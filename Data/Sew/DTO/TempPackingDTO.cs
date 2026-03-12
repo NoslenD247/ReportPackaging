@@ -3,6 +3,7 @@
     public class TempPackingDTO
     {
         public int Id { get; set; }
+        public string ReportDate { get; set; } = string.Empty;
         public string Buyer { get; set; } = string.Empty;
         public string Style { get; set; } = string.Empty;
         public string Po { get; set; } = string.Empty;

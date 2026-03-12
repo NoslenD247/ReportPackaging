@@ -42,9 +42,15 @@
 
     <!-- Tabla editable -->
     @if (rows.Count > 0)
+
     {
         <div style="margin-top:10px;">
             <h4>✅ @rows.Count fila(s) detectadas — edita si es necesario</h4>
+
+            <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                <label style="font-size:13px; color:#555; font-weight:600;">📅 Fecha:</label>
+                <input style="@inputStyle" @bind="fechaReporte" />
+            </div>
 
             <div style="overflow-x:auto; border:1px solid #ddd; border-radius:8px;">
                 <table style="border-collapse:collapse; width:100%; font-size:13px;">
@@ -66,6 +72,9 @@
                                 <td style="@tdStyle"><input style="@inputStyle" @bind="r.Style" /></td>
                                 <td style="@tdStyle"><input style="@inputStyle" @bind="r.PO" /></td>
                                 <td style="@tdStyle"><input style="@inputStyle" @bind="r.Color" /></td>
+                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.XL2" /></td>
+                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.XL3" /></td>
+                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.TotalHoy" /></td>
                                 <td style="@tdStyle; text-align:center;">
                                     <button @onclick="() => EliminarFila(r)"
                                             style="background:none; border:none; color:#e53935; font-size:16px; cursor:pointer;">
@@ -107,6 +116,7 @@
     private bool isGuardando = false;
     private string errorMessage = string.Empty;
     private string mensajeGuardado = string.Empty;
+    private string fechaReporte = string.Empty;
     private List<ReportRow> rows = new();
 
     private string thStyle = "padding:8px 10px; text-align:left; white-space:nowrap;";
@@ -162,6 +172,7 @@
             var reportData = await azureService.AnalyzeReportAsync(memoryStream);
 
             rows = reportData.Rows;
+            fechaReporte = reportData.Fecha;
 
             if (rows.Count == 0)
                 errorMessage = "No se detectaron filas. Intenta con mejor iluminación.";
@@ -210,7 +221,8 @@
                     Xl = (int)row.XL,
                     Xl2 = (int)row.XL2,
                     Xl3 = (int)row.XL3,
-                    TodayTotal = (int)row.TotalHoy
+                    TodayTotal = (int)row.TotalHoy,
+                    ReportDate = fechaReporte,
                 };
 
                 var ok = await TempPackingService.InsertAsync(dto);

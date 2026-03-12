@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using ReportPackaging.Data.Sew.IService;
 using ReportPackaging.Data.Sew.Service;
 using ReportPackaging.Services;
-using Syncfusion.Blazor;
 
 namespace ReportPackaging
 {
@@ -24,13 +23,12 @@ namespace ReportPackaging
 
             builder.Services.AddHttpClient("ApiClient", client =>
             {
-                client.BaseAddress = new Uri(AppSettings.Current.ApiSettings.TestUrl); // ← aquí
+                client.BaseAddress = new Uri(AppSettings.Current.ApiSettings.TestUrl);
             });
 
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();
     		builder.Logging.AddDebug();
-            builder.Services.AddSyncfusionBlazor();
 
             builder.Services.AddScoped<ITempPackingService, TempPackingService>();
 

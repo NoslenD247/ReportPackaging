@@ -53,12 +53,29 @@ namespace ReportPackaging.Services
 
                 System.Diagnostics.Debug.WriteLine($"[AzureOCR] Tablas detectadas: {result.Tables.Count}");
 
+                if (result.Pages?.Count > 0)
+                {
+                    var lines = result.Pages
+                        .SelectMany(p => p.Lines)
+                        .Select(l => l.Content.Trim())
+                        .ToList();
+
+                    for (int i = 0; i < lines.Count; i++)
+                    {
+                        if (lines[i].ToLowerInvariant().StartsWith("fecha") && i + 1 < lines.Count)
+                        {
+                            reportData.Fecha = lines[i + 1];
+                            break;
+                        }
+                    }
+                }
+
                 foreach (var table in result.Tables)
                 {
                     System.Diagnostics.Debug.WriteLine($"[AzureOCR] Tabla: {table.RowCount} filas x {table.ColumnCount} columnas");
 
                     // 1. Leer encabezados (fila 0)
-                    var headers = new Dictionary<int, string>(); // columna index → nombre
+                    var headers = new Dictionary<int, string>();
                     var fila0 = new Dictionary<int, string>();
                     var fila1 = new Dictionary<int, string>();
                     foreach (var cell in table.Cells)
@@ -114,8 +131,7 @@ namespace ReportPackaging.Services
                             var headerName = headerKv.Value;
                             var value = cells.TryGetValue(colIdx, out var v) ? v : string.Empty;
 
-                            if (Match(headerName, ColFecha)) row.Fecha = value;
-                            else if (Match(headerName, ColCodigo)) row.Codigo = value;
+                            if (Match(headerName, ColCodigo)) row.Codigo = value;
                             else if (Match(headerName, ColBuyer)) row.Buyer = value;
                             else if (Match(headerName, ColStyle)) row.Style = value;
                             else if (Match(headerName, ColPO)) row.PO = value;
@@ -134,8 +150,7 @@ namespace ReportPackaging.Services
                         }
 
                         // Solo agregar si la fila tiene algo útil
-                        if (!string.IsNullOrEmpty(row.Fecha) || !string.IsNullOrEmpty(row.PO) ||
-                            !string.IsNullOrEmpty(row.Buyer) || row.TotalHoy > 0)
+                        if (!string.IsNullOrEmpty(row.Buyer) || row.TotalHoy > 0 || !string.IsNullOrEmpty(row.Style))
                         {
                             reportData.Rows.Add(row);
                         }

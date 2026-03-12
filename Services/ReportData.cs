@@ -3,7 +3,6 @@
     // Una fila de la tabla del reporte
     public class ReportRow
     {
-        public string Fecha { get; set; } = string.Empty;
         public string Codigo { get; set; } = string.Empty;
         public string Buyer { get; set; } = string.Empty;
         public string Style { get; set; } = string.Empty;
@@ -31,5 +30,6 @@
     {
         public List<ReportRow> Rows { get; set; } = new List<ReportRow>();
         public string RawMarkdown { get; set; } = string.Empty; // texto crudo de Mistral
+        public string Fecha { get; set; } = string.Empty;
     }
 }
