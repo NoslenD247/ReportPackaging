@@ -37,7 +37,7 @@ namespace ReportPackaging.Services
 
                 System.Diagnostics.Debug.WriteLine($"[AzureShipping] Tables detected: {result.Tables.Count}");
 
-                // ── 1. Extract header fields from Lines ──────────────────────────
+                // 1. Extract header fields from Lines
                 if (result.Pages?.Count > 0)
                 {
                     var allLines = result.Pages
@@ -48,7 +48,7 @@ namespace ReportPackaging.Services
                     ExtractHeaderFromLines(allLines, shippingData);
                 }
 
-                // ── 2. Extract rolls from tables ─────────────────────────────────
+                // 2. Extract rolls from tables
                 foreach (var table in result.Tables)
                 {
                     System.Diagnostics.Debug.WriteLine($"[AzureShipping] Table: {table.RowCount} rows x {table.ColumnCount} cols");
@@ -166,7 +166,7 @@ namespace ReportPackaging.Services
                 var raw = n[i];
                 var low = raw.ToLowerInvariant();
 
-                // ── FECHA DIA/MES/ANO ─────────────────────────────────────────
+                // FECHA DIA/MES/ANO
                 // Labels "DIA" "MES" "ANO" appear on consecutive lines,
                 // then their values appear right after as 3 more consecutive lines
                 if (low == "dia" || low == "día")
@@ -189,7 +189,7 @@ namespace ReportPackaging.Services
                     continue;
                 }
 
-                // ── CLIENTE ───────────────────────────────────────────────────
+                // CLIENTE
                 if (low.StartsWith("cliente"))
                 {
                     data.Cliente = AfterColon(raw);
@@ -199,7 +199,7 @@ namespace ReportPackaging.Services
                     continue;
                 }
 
-                // ── BUYER ─────────────────────────────────────────────────────
+                // BUYER
                 if (low.StartsWith("buyer"))
                 {
                     data.Buyer = AfterColon(raw);
@@ -209,7 +209,7 @@ namespace ReportPackaging.Services
                     continue;
                 }
 
-                // ── TIPO DE TELA ──────────────────────────────────────────────
+                //  TIPO DE TELA
                 // "TIPO DE TELA :-" → value is next line
                 if (low.StartsWith("tipo de tela"))
                 {
@@ -220,7 +220,7 @@ namespace ReportPackaging.Services
                     continue;
                 }
 
-                // ── No. ───────────────────────────────────────────────────────
+                //  No.
                 // "No. J02601160118-1" — value on same line after "No."
                 if (low.StartsWith("no."))
                 {
@@ -230,7 +230,7 @@ namespace ReportPackaging.Services
                     continue;
                 }
 
-                // ── FABRICA DE LLEGADA ────────────────────────────────────────
+                //  FABRICA DE LLEGADA 
                 // "FABRICA DE" then next line "LLEGADA:" then value on next line
                 if (low.StartsWith("fabrica de") || low.StartsWith("fábrica de"))
                 {
@@ -245,7 +245,7 @@ namespace ReportPackaging.Services
                     continue;
                 }
 
-                // ── ANCHO ─────────────────────────────────────────────────────
+                // ANCHO
                 if (low.StartsWith("ancho"))
                 {
                     data.Ancho = AfterColon(raw);
@@ -255,7 +255,7 @@ namespace ReportPackaging.Services
                     continue;
                 }
 
-                // ── COLOR ─────────────────────────────────────────────────────
+                // COLOR
                 if (low.StartsWith("color"))
                 {
                     data.Color = AfterColon(raw);
@@ -265,7 +265,7 @@ namespace ReportPackaging.Services
                     continue;
                 }
 
-                // ── LOT ───────────────────────────────────────────────────────
+                //  LOT 
                 if (low.StartsWith("lot"))
                 {
                     data.Lot = AfterColon(raw);
@@ -275,7 +275,7 @@ namespace ReportPackaging.Services
                     continue;
                 }
 
-                // ── GRAND TOTAL ───────────────────────────────────────────────
+                //  GRAND TOTAL 
                 // OCR sometimes reads "RAND TOTAL" (drops the G)
                 if (low.Contains("rand total") || low.Contains("grand total"))
                 {
@@ -286,7 +286,7 @@ namespace ReportPackaging.Services
                     continue;
                 }
 
-                // ── NUMERO DE ORDEN ───────────────────────────────────────────
+                // NUMERO DE ORDEN 
                 if (low.Contains("numero de orden") || low.Contains("número de orden"))
                 {
                     data.OrderNumber = AfterColon(raw);
@@ -297,7 +297,7 @@ namespace ReportPackaging.Services
                 }
             }
 
-            // ── LOT fallback: standalone number right after color value ───────
+            // LOT fallback: standalone number right after color value
             if (string.IsNullOrWhiteSpace(data.Lot) && !string.IsNullOrWhiteSpace(data.Color))
             {
                 int colorIdx = n.FindIndex(l => l.Equals(data.Color, StringComparison.OrdinalIgnoreCase));
@@ -312,7 +312,7 @@ namespace ReportPackaging.Services
                 }
             }
 
-            // ── S/# fallback: look for series number pattern ──────────────────
+            // S/# fallback: look for series number pattern
             if (string.IsNullOrWhiteSpace(data.Serie))
             {
                 var candidate = n.FirstOrDefault(l =>

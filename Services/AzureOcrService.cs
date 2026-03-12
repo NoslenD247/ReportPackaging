@@ -98,7 +98,7 @@ namespace ReportPackaging.Services
                         System.Diagnostics.Debug.WriteLine($"[AzureOCR] Header col {kv.Key}: '{headers[kv.Key]}'");
                     }
 
-                    // Verificar que esta tabla tiene al menos una columna que nos interesa
+                    // Verificar que esta tabla tiene al menos una columna que nos sirva
                     bool esTablaRelevante = headers.Values.Any(h =>
                         ColFecha.Contains(h) || ColBuyer.Contains(h) ||
                         ColStyle.Contains(h) || ColPO.Contains(h));
