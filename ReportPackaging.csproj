@@ -66,6 +66,10 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Compile Remove="Data\Sew\DTO\Sew_FabricInboundDTO.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
       <Content Remove="appsettings.json" />
     </ItemGroup>
 

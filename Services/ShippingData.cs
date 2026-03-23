@@ -1,19 +1,9 @@
 namespace ReportPackaging.Services
 {
-    // Una fila de las tablas de rolls
-    public class ShippingRollRow
-    {
-        public string Numero { get; set; } = string.Empty;
-        public string NumeroDeRoll { get; set; } = string.Empty;
-        public decimal PesoDeCrudo { get; set; }
-        public decimal PesoDeAcabado { get; set; }
-        public decimal Yards { get; set; }
-    }
-
-    // Contenedor principal del documento
     public class ShippingData
     {
-        // ── Encabezado ──────────────────────────────────
+        // ── Encabezado extraído del OCR ──────────────────
+        public string TextileCompany { get; set; } = string.Empty;
         public string Dia { get; set; } = string.Empty;
         public string Mes { get; set; } = string.Empty;
         public string Ano { get; set; } = string.Empty;
@@ -27,11 +17,18 @@ namespace ReportPackaging.Services
         public string Color { get; set; } = string.Empty;
         public string Lot { get; set; } = string.Empty;
 
-        // ── Filas de las 3 tablas combinadas ────────────
-        public List<ShippingRollRow> Rolls { get; set; } = new List<ShippingRollRow>();
+        // ── Totales ──────────────────────────────────────
+        public int TotalRolls { get; set; }
+        public decimal TotalPesoCrudo { get; set; }
+        public decimal TotalPesoAcabado { get; set; }
+        public decimal TotalYards { get; set; }
 
-        // ── Pie de documento ────────────────────────────
-        public string GrandTotal { get; set; } = string.Empty;
+        // ── Campos adicionales (se guardan en DB) ────────
+        public decimal BodyReceived { get; set; }
+        public decimal RibReceived { get; set; }
+        public string Rack { get; set; } = string.Empty;
+
+        // ── Pie de documento ─────────────────────────────
         public string OrderNumber { get; set; } = string.Empty;
     }
 }

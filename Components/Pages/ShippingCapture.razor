@@ -1,173 +1,228 @@
 ﻿@page "/shipping-capture"
 
 @using ReportPackaging.Services
+@using ReportPackaging.Data.Sew.DTO
+@using ReportPackaging.Data.Sew.IService
+@using ReportPackaging.Data.Sew.Service
 @using System.Text.Json
+
+@inject ISew_FabricInboundScanService FabricInboundScanService
+@inject IFactoryService FactoryService
 
 <div style="padding: 20px; font-family: sans-serif; max-width: 100%;">
 
     <h3>📦 Envío de Mercaderías</h3>
 
-    <!-- Botones de captura -->
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
-        <button @onclick="OnTakePhotoClicked" disabled="@isLoading"
-                style="background:#0078d4; color:white; padding:12px 20px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
-            📷 Tomar Foto
-        </button>
-        <button @onclick="OnPickPhotoClicked" disabled="@isLoading"
-                style="background:#107c41; color:white; padding:12px 20px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
-            🖼️ Subir Imagen
-        </button>
-    </div>
-
-    <!-- Loading -->
-    @if (isLoading)
+    <!-- SELECTOR DE TEMPLATE -->
+    @if (templateSeleccionado == 0)
     {
-        <div style="padding:16px; background:#fff8e1; border-radius:8px; color:#7a5c00; margin-bottom:16px;">
-            ⏳ Procesando documento con Azure...
-        </div>
-    }
+        <div style="margin-bottom:16px;">
+            <p style="font-size:14px; color:#555; margin-bottom:12px;">
+                Selecciona el tipo de documento a escanear:
+            </p>
+            <div style="display:flex; flex-direction:column; gap:10px;">
 
-    <!-- Error -->
-    @if (!string.IsNullOrEmpty(errorMessage))
-    {
-        <div style="padding:12px; background:#fde8e8; border:1px solid #f44336; border-radius:8px; color:#c00; margin-bottom:16px;">
-            ❌ @errorMessage
-        </div>
-    }
+                <button @onclick="() => SeleccionarTemplate(1)"
+                        style="background:white; border:2px solid #0078d4; border-radius:10px;
+                                   padding:14px 16px; text-align:left; cursor:pointer;">
+                    <div style="font-weight:700; color:#0078d4; font-size:14px;">📄 Textiles Solafe</div>
+                    <div style="font-size:12px; color:#777; margin-top:3px;">ENVIO DE MERCADERÍAS</div>
+                </button>
 
-    <!-- Datos extraídos -->
-    @if (shippingData != null)
-    {
-        <!-- Encabezado editable -->
-        <div style="background:#f5f5f5; border-radius:8px; padding:16px; margin-bottom:16px;">
-            <h4 style="margin-top:0;">📋 Encabezado</h4>
-            <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
+                <button @onclick="() => SeleccionarTemplate(2)"
+                        style="background:white; border:2px solid #107c41; border-radius:10px;
+                                   padding:14px 16px; text-align:left; cursor:pointer;">
+                    <div style="font-weight:700; color:#107c41; font-size:14px;">📄 C.R. Textil</div>
+                    <div style="font-size:12px; color:#777; margin-top:3px;">ENVIO DE MERCADERÍAS — C.R. Textil, S.A.</div>
+                </button>
 
-                <div>
-                    <label style="@labelStyle">Fecha (Día / Mes / Año)</label>
-                    <div style="display:flex; gap:4px;">
-                        <input style="@inputStyle; width:50px;" @bind="shippingData.Dia" placeholder="DD" />
-                        <input style="@inputStyle; width:50px;" @bind="shippingData.Mes" placeholder="MM" />
-                        <input style="@inputStyle; width:60px;" @bind="shippingData.Ano" placeholder="AAAA" />
-                    </div>
-                </div>
-
-                <div>
-                    <label style="@labelStyle">No.</label>
-                    <input style="@inputStyle" @bind="shippingData.No" />
-                </div>
-
-                <div>
-                    <label style="@labelStyle">Cliente</label>
-                    <input style="@inputStyle" @bind="shippingData.Cliente" />
-                </div>
-
-                <div>
-                    <label style="@labelStyle">Buyer</label>
-                    <input style="@inputStyle" @bind="shippingData.Buyer" />
-                </div>
-
-                <div>
-                    <label style="@labelStyle">Fábrica de Llegada</label>
-                    <input style="@inputStyle" @bind="shippingData.FabricaDeLlegada" />
-                </div>
-
-                <div>
-                    <label style="@labelStyle">S/#</label>
-                    <input style="@inputStyle" @bind="shippingData.Serie" />
-                </div>
-
-                <div>
-                    <label style="@labelStyle">Tipo de Tela</label>
-                    <input style="@inputStyle" @bind="shippingData.TipoDeTela" />
-                </div>
-
-                <div>
-                    <label style="@labelStyle">Ancho</label>
-                    <input style="@inputStyle" @bind="shippingData.Ancho" />
-                </div>
-
-                <div>
-                    <label style="@labelStyle">Color</label>
-                    <input style="@inputStyle" @bind="shippingData.Color" />
-                </div>
-
-                <div>
-                    <label style="@labelStyle">Lot</label>
-                    <input style="@inputStyle" @bind="shippingData.Lot" />
-                </div>
+                <button @onclick="() => SeleccionarTemplate(3)"
+                        style="background:white; border:2px solid #e53935; border-radius:10px;
+                                   padding:14px 16px; text-align:left; cursor:pointer;">
+                    <div style="font-weight:700; color:#e53935; font-size:14px;">📄 Apparel Links</div>
+                    <div style="font-size:12px; color:#777; margin-top:3px;">REPORTE DE PACKING LIST BODEGA DE TELA</div>
+                </button>
 
             </div>
         </div>
-
-        <!-- Tabla de Rolls editable -->
-        <h4>🧵 Rolls — @shippingData.Rolls.Count fila(s) detectadas</h4>
-        <div style="overflow-x:auto; border:1px solid #ddd; border-radius:8px; margin-bottom:16px;">
-            <table style="border-collapse:collapse; width:100%; font-size:13px;">
-                <thead>
-                    <tr style="background:#0078d4; color:white;">
-                        <th style="@thStyle">#</th>
-                        <th style="@thStyle">No. de Roll</th>
-                        <th style="@thStyle">Peso de Crudo</th>
-                        <th style="@thStyle">Peso de Acabado</th>
-                        <th style="@thStyle">Yards</th>
-                        <th style="@thStyle">🗑️</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var roll in shippingData.Rolls)
-                    {
-                        var r = roll;
-                        <tr style="border-bottom:1px solid #eee;">
-                            <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.Numero" /></td>
-                            <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.NumeroDeRoll" /></td>
-                            <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.PesoDeCrudo" /></td>
-                            <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.PesoDeAcabado" /></td>
-                            <td style="@tdStyle"><input style="@inputStyleNum" @bind="r.Yards" /></td>
-                            <td style="@tdStyle; text-align:center;">
-                                <button @onclick="() => EliminarRoll(r)"
-                                        style="background:none; border:none; color:#e53935; font-size:16px; cursor:pointer;">
-                                    🗑️
-                                </button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Pie de documento -->
-        <div style="background:#f5f5f5; border-radius:8px; padding:16px; margin-bottom:16px;">
-            <h4 style="margin-top:0;">📊 Totales</h4>
-            <div style="display:flex; gap:16px; flex-wrap:wrap;">
-                <div>
-                    <label style="@labelStyle">Grand Total</label>
-                    <input style="@inputStyle" @bind="shippingData.GrandTotal" />
-                </div>
-                <div>
-                    <label style="@labelStyle">Número de Orden</label>
-                    <input style="@inputStyle" @bind="shippingData.OrderNumber" />
-                </div>
-            </div>
-        </div>
-
-        <!-- Botones de acción -->
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button @onclick="AgregarRoll"
-                    style="background:#6c757d; color:white; padding:10px 18px; border:none; border-radius:8px; cursor:pointer;">
-                ➕ Agregar Fila
-            </button>
-            <button @onclick="GuardarDatos" disabled="@isGuardando"
-                    style="background:#28a745; color:white; padding:10px 24px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
-                💾 @(isGuardando ? "Guardando..." : "Guardar en DB")
+    }
+    else
+    {
+        <!-- Header con template seleccionado -->
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;
+                        padding:10px 14px; background:#f0f7ff; border-radius:8px; border:1px solid #0078d4;">
+            <span style="font-size:13px; color:#0078d4; font-weight:600;">
+                📄 @NombreTemplate
+            </span>
+            <button @onclick="CambiarTemplate"
+                    style="margin-left:auto; background:none; border:1px solid #0078d4;
+                               color:#0078d4; border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer;">
+                Cambiar
             </button>
         </div>
 
-        @if (!string.IsNullOrEmpty(mensajeGuardado))
+        <!-- Botones de captura -->
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+            <button @onclick="OnTakePhotoClicked" disabled="@isLoading"
+                    style="background:#0078d4; color:white; padding:12px 20px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
+                📷 Tomar Foto
+            </button>
+            <button @onclick="OnPickPhotoClicked" disabled="@isLoading"
+                    style="background:#107c41; color:white; padding:12px 20px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
+                🖼️ Subir Imagen
+            </button>
+        </div>
+
+        <!-- Loading -->
+        @if (isLoading)
         {
-            <div style="margin-top:12px; padding:12px; background:#e8f5e9; border-radius:8px; color:#2e7d32;">
-                ✅ @mensajeGuardado
+            <div style="padding:16px; background:#fff8e1; border-radius:8px; color:#7a5c00; margin-bottom:16px;">
+                ⏳ Procesando documento con Azure...
             </div>
+        }
+
+        <!-- Error -->
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div style="padding:12px; background:#fde8e8; border:1px solid #f44336; border-radius:8px; color:#c00; margin-bottom:16px;">
+                ❌ @errorMessage
+            </div>
+        }
+
+        @if (shippingData != null)
+        {
+            <!-- Grupo 1: General Information -->
+            <div style="background:#f5f5f5; border-radius:8px; padding:16px; margin-bottom:16px;">
+                <h4 style="margin-top:0; color:#0078d4; border-bottom:2px solid #0078d4; padding-bottom:6px;">
+                    📋 General Information
+                </h4>
+                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:10px;">
+
+                    <div>
+                        <label style="@labelStyle">No. Envío</label>
+                        <input style="@inputStyle" @bind="noEnvio" placeholder="No. Envío..." />
+                    </div>
+
+                    <div>
+                        <label style="@labelStyle">Entry Date (Día / Mes / Año)</label>
+                        <div style="display:flex; gap:4px;">
+                            <input style="@inputStyle; width:45px;" @bind="shippingData.Dia" placeholder="DD" />
+                            <input style="@inputStyle; width:45px;" @bind="shippingData.Mes" placeholder="MM" />
+                            <input style="@inputStyle; width:60px;" @bind="shippingData.Ano" placeholder="AAAA" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="@labelStyle">Buyer</label>
+                        <select style="@inputStyle" @bind="selectedBuyerId">
+                            <option value="0">-- Seleccionar --</option>
+                            @foreach (var b in buyers)
+                            {
+                                <option value="@b.Id">@b.SmallName</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="@labelStyle">S/#</label>
+                        <input style="@inputStyle" @bind="shippingData.Serie" />
+                    </div>
+
+                    <div>
+                        <label style="@labelStyle">Textile Company</label>
+                        <select style="@inputStyle" @bind="selectedSupplierId">
+                            <option value="0">-- Seleccionar --</option>
+                            @foreach (var s in suppliers)
+                            {
+                                <option value="@s.Id">@s.SupplierName</option>
+                            }
+                        </select>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Grupo 2: Fabric Information -->
+            <div style="background:#e8f4fd; border-radius:8px; padding:16px; margin-bottom:16px;">
+                <h4 style="margin-top:0; color:#0078d4; border-bottom:2px solid #0078d4; padding-bottom:6px;">
+                    🧵 Fabric Information
+                </h4>
+                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:10px;">
+
+                    <div>
+                        <label style="@labelStyle">Tipo de Tela</label>
+                        <input style="@inputStyle" @bind="shippingData.TipoDeTela" />
+                    </div>
+                    <div>
+                        <label style="@labelStyle">Color</label>
+                        <input style="@inputStyle" @bind="shippingData.Color" />
+                    </div>
+                    <div>
+                        <label style="@labelStyle">Lot</label>
+                        <input style="@inputStyle" @bind="shippingData.Lot" />
+                    </div>
+                    <div>
+                        <label style="@labelStyle">Width</label>
+                        <input style="@inputStyle" @bind="shippingData.Ancho" />
+                    </div>
+                    <div>
+                        <label style="@labelStyle">Rolls</label>
+                        <input style="@inputStyle" @bind="shippingData.TotalRolls" />
+                    </div>
+                    <div>
+                        <label style="@labelStyle">Peso (Kgs)</label>
+                        <input style="@inputStyle" @bind="shippingData.TotalPesoCrudo" />
+                    </div>
+
+                    <!-- Body / Rib toggle -->
+                    <div style="grid-column: span 2;">
+                        <label style="@labelStyle">Yards — selecciona tipo</label>
+                        <div style="display:flex; gap:0; margin-bottom:6px;">
+                            <button @onclick="() => SeleccionarTipoYards(true)"
+                                    style="flex:1; padding:8px; border:2px solid @(isBody ? "#0078d4" : "#ccc");
+                                                   background:@(isBody ? "#0078d4" : "white");
+                                                   color:@(isBody ? "white" : "#333");
+                                                   border-radius:6px 0 0 6px; cursor:pointer; font-weight:600; font-size:13px;">
+                                🧴 Body
+                            </button>
+                            <button @onclick="() => SeleccionarTipoYards(false)"
+                                    style="flex:1; padding:8px; border:2px solid @(!isBody ? "#0078d4" : "#ccc");
+                                                   background:@(!isBody ? "#0078d4" : "white");
+                                                   color:@(!isBody ? "white" : "#333");
+                                                   border-radius:0 6px 6px 0; cursor:pointer; font-weight:600; font-size:13px;">
+                                🧶 Rib
+                            </button>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <input style="@inputStyle; margin:0;" @bind="shippingData.TotalYards" readonly />
+                            <span style="font-size:11px; color:#888; white-space:nowrap;">
+                                → @(isBody ? "Body Received" : "Rib Received")
+                            </span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="@labelStyle">Rack</label>
+                        <input style="@inputStyle" @bind="shippingData.Rack" />
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Botones -->
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button @onclick="GuardarDatos" disabled="@isGuardando"
+                        style="background:#28a745; color:white; padding:10px 24px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
+                    💾 @(isGuardando ? "Guardando..." : "Guardar en DB")
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(mensajeGuardado))
+            {
+                <div style="margin-top:12px; padding:12px; background:#e8f5e9; border-radius:8px; color:#2e7d32;">
+                    ✅ @mensajeGuardado
+                </div>
+            }
         }
     }
 
@@ -175,18 +230,85 @@
 
 @code {
 
+    private int templateSeleccionado = 0;
     private bool isLoading = false;
     private bool isGuardando = false;
+    private bool isBody = true;
     private string errorMessage = string.Empty;
     private string mensajeGuardado = string.Empty;
+    private string noEnvio = string.Empty;
     private ShippingData? shippingData = null;
 
-    // Estilos
-    private string thStyle = "padding:8px 10px; text-align:left; white-space:nowrap;";
-    private string tdStyle = "padding:4px 6px;";
+    private int selectedBuyerId = 0;
+    private int selectedSupplierId = 0;
+
+    private List<BuyerDTO> buyers = new();
+    private List<SupplierDTO> suppliers = new();
+
     private string inputStyle = "width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box;";
-    private string inputStyleNum = "width:80px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:12px; text-align:right;";
     private string labelStyle = "font-size:11px; color:#666; display:block; margin-bottom:3px;";
+
+    private string NombreTemplate => templateSeleccionado switch
+    {
+        1 => "Textiles Solafe — ENVIO DE MERCADERÍAS",
+        2 => "C.R. Textil — ENVIO DE MERCADERÍAS",
+        3 => "Apparel Links — PACKING LIST BODEGA DE TELA",
+        _ => string.Empty
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarListas();
+    }
+
+    private async Task CargarListas()
+    {
+        buyers = (await FactoryService.GetBuyersByCenter(14)).ToList();
+        suppliers = (await FactoryService.GetSuppliersByCenter(14)).ToList();
+    }
+
+    private void SeleccionarTemplate(int template)
+    {
+        templateSeleccionado = template;
+        shippingData = null;
+        errorMessage = string.Empty;
+        mensajeGuardado = string.Empty;
+        StateHasChanged();
+    }
+
+    private void CambiarTemplate()
+    {
+        templateSeleccionado = 0;
+        shippingData = null;
+        errorMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void SeleccionarTipoYards(bool body)
+    {
+        isBody = body;
+        StateHasChanged();
+    }
+
+    private void AutoSeleccionarListas()
+    {
+        if (!string.IsNullOrWhiteSpace(shippingData?.Buyer))
+        {
+            var match = buyers.FirstOrDefault(b =>
+                b.BuyerName.Contains(shippingData.Buyer, StringComparison.OrdinalIgnoreCase) ||
+                b.SmallName?.Contains(shippingData.Buyer, StringComparison.OrdinalIgnoreCase) == true ||
+                shippingData.Buyer.Contains(b.BuyerName, StringComparison.OrdinalIgnoreCase));
+            selectedBuyerId = match?.Id ?? 0;
+        }
+
+        if (!string.IsNullOrWhiteSpace(shippingData?.TextileCompany))
+        {
+            var match = suppliers.FirstOrDefault(s =>
+                s.SupplierName.Contains(shippingData.TextileCompany, StringComparison.OrdinalIgnoreCase) ||
+                shippingData.TextileCompany.Contains(s.SupplierName, StringComparison.OrdinalIgnoreCase));
+            selectedSupplierId = match?.Id ?? 0;
+        }
+    }
 
     private async Task OnTakePhotoClicked()
     {
@@ -214,6 +336,9 @@
             errorMessage = string.Empty;
             mensajeGuardado = string.Empty;
             shippingData = null;
+            isBody = true;
+            selectedBuyerId = 0;
+            selectedSupplierId = 0;
             isLoading = true;
             StateHasChanged();
 
@@ -232,11 +357,15 @@
             await stream.CopyToAsync(memoryStream);
             memoryStream.Position = 0;
 
-            var service = new AzureShippingService(endpoint, apiKey);
-            shippingData = await service.AnalyzeShippingAsync(memoryStream);
+            shippingData = templateSeleccionado switch
+            {
+                1 => await new AzureShippingService(endpoint, apiKey).AnalyzeShippingAsync(memoryStream),
+                2 => await new AzureShippingServiceCR(endpoint, apiKey).AnalyzeShippingAsync(memoryStream),
+                3 => await new AzureShippingServiceAL(endpoint, apiKey).AnalyzeShippingAsync(memoryStream),
+                _ => throw new Exception("Template no seleccionado.")
+            };
 
-            if (shippingData.Rolls.Count == 0)
-                errorMessage = "No se detectaron rolls. Intenta con mejor iluminación.";
+            AutoSeleccionarListas();
         }
         catch (Exception ex)
         {
@@ -250,16 +379,6 @@
         }
     }
 
-    private void EliminarRoll(ShippingRollRow roll)
-    {
-        shippingData?.Rolls.Remove(roll);
-    }
-
-    private void AgregarRoll()
-    {
-        shippingData?.Rolls.Add(new ShippingRollRow());
-    }
-
     private async Task GuardarDatos()
     {
         try
@@ -268,11 +387,48 @@
             mensajeGuardado = string.Empty;
             StateHasChanged();
 
-            // TODO: conectar DB
-            await Task.Delay(800);
-            // await _dbService.GuardarEnvio(shippingData);
+            DateTime entryDate = DateTime.Now;
+            if (int.TryParse(shippingData.Dia, out int dia) &&
+                int.TryParse(shippingData.Mes, out int mes) &&
+                int.TryParse(shippingData.Ano, out int ano))
+            {
+                entryDate = new DateTime(ano, mes, dia);
+            }
 
-            mensajeGuardado = $"Documento guardado — {shippingData?.Rolls.Count} roll(s).";
+            decimal bodyReceived = isBody ? shippingData.TotalYards : 0;
+            decimal ribReceived = isBody ? 0 : shippingData.TotalYards;
+
+            var supplierName = suppliers.FirstOrDefault(s => s.Id == selectedSupplierId)?.SupplierName ?? string.Empty;
+
+            var dto = new Sew_FabricInboundScanDTO
+            {
+                EnvID = noEnvio,
+                EntryDate = entryDate,
+                FileNo = shippingData.Serie ?? string.Empty,
+                Color = shippingData.Color ?? string.Empty,
+                Lot = shippingData.Lot ?? string.Empty,
+                Width = shippingData.Ancho ?? string.Empty,
+                Rolls = shippingData.TotalRolls,
+                KgsReceived = shippingData.TotalPesoCrudo,
+                BodyReceived = bodyReceived,
+                RibReceived = ribReceived,
+                FabricType = shippingData.TipoDeTela ?? string.Empty,
+                SupplierName = supplierName,
+                SupplierId = selectedSupplierId,
+                BuyerId = selectedBuyerId,
+                Rack = shippingData.Rack ?? string.Empty,
+                CreatedDate = DateTime.Now,
+                LastUpdatedDate = DateTime.Now,
+                CreatedByUserName = "MAUI",
+                LastUpdatedByUserId = "MAUI",
+                LastUpdatedByUserNameEn = "MAUI"
+            };
+
+            var ok = await FabricInboundScanService.CreateFabricInboundScan(dto);
+
+            mensajeGuardado = ok
+                ? "Documento guardado correctamente."
+                : "⚠️ Error al guardar. Revisa tu conexión.";
         }
         catch (Exception ex)
         {

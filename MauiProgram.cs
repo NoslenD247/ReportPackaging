@@ -30,7 +30,9 @@ namespace ReportPackaging
             builder.Services.AddBlazorWebViewDeveloperTools();
     		builder.Logging.AddDebug();
 
-            builder.Services.AddScoped<ITempPackingService, TempPackingService>();
+            builder.Services.AddScoped<ITempPackingService, TempPackingScanService>();
+            builder.Services.AddScoped<ISew_FabricInboundScanService, Sew_FabricInboundScanService>();
+            builder.Services.AddScoped<IFactoryService, FactoryService>();
 
             //builder.Configuration.AddJsonFile("appsettings.json");
 #endif
