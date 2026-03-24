@@ -8,6 +8,7 @@
 
 @inject ISew_FabricInboundScanService FabricInboundScanService
 @inject IFactoryService FactoryService
+@inject ISewGetDataFromUserService SewGetDataFromUserService
 
 <div style="padding: 20px; font-family: sans-serif; max-width: 100%;">
 
@@ -242,8 +243,12 @@
     private int selectedBuyerId = 0;
     private int selectedSupplierId = 0;
 
+    private string _email = string.Empty;
+    private bool _isLoggedIn;
+
     private List<BuyerDTO> buyers = new();
     private List<SupplierDTO> suppliers = new();
+    private Sew_GetDataFromUserDTO? currentUser = null;
 
     private string inputStyle = "width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box;";
     private string labelStyle = "font-size:11px; color:#666; display:block; margin-bottom:3px;";
@@ -258,6 +263,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _email = SessionService.GetUserEmail();
+        _isLoggedIn = Preferences.Get("is_logged_in", false);
         await CargarListas();
     }
 
@@ -265,6 +272,8 @@
     {
         buyers = (await FactoryService.GetBuyersByCenter(14)).ToList();
         suppliers = (await FactoryService.GetSuppliersByCenter(14)).ToList();
+        currentUser = (await SewGetDataFromUserService.GetAllAsync(_email)).FirstOrDefault();
+        Console.WriteLine($"Id:{currentUser.ID} | UserName:{currentUser.UserName} | Email:{currentUser.Email} | NameEn:{currentUser.NameEn} | CenterId:{currentUser.CenterId}");
     }
 
     private void SeleccionarTemplate(int template)
@@ -419,9 +428,10 @@
                 Rack = shippingData.Rack ?? string.Empty,
                 CreatedDate = DateTime.Now,
                 LastUpdatedDate = DateTime.Now,
-                CreatedByUserName = "MAUI",
-                LastUpdatedByUserId = "MAUI",
-                LastUpdatedByUserNameEn = "MAUI"
+                CreatedByUserName = currentUser.UserName,
+                LastUpdatedByUserId = currentUser.ID,
+                LastUpdatedByUserNameEn = currentUser.NameEn,
+                CenterId = currentUser.CenterId
             };
 
             var ok = await FabricInboundScanService.CreateFabricInboundScan(dto);
