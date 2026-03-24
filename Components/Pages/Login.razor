@@ -32,6 +32,14 @@
     private string _statusMessage = "Esperando autenticación...";
     private string _errorMessage = string.Empty;
 
+    protected override void OnInitialized()
+    {
+        if (Preferences.Get("is_logged_in", false))
+        {
+            Navigation.NavigateTo("/home");
+        }
+    }
+
     private async Task OnLoginClicked()
     {
         try
@@ -75,7 +83,7 @@
                         // 6. Guardar sesión de forma segura
                         await SessionService.SaveSessionAsync(token, email);
                         _statusMessage = "Autenticado correctamente ✅";
-                        Navigation.NavigateTo("/");
+                        Navigation.NavigateTo("/home", forceLoad: true);
                     }
                     else
                     {

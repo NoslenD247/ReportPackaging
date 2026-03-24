@@ -1,5 +1,19 @@
 ﻿@page "/home"
+@using ReportPackaging.Services
 
 <h1>Hello, world!</h1>
+<p>Welcome to your new app.</p>
 
-Welcome to your new app.
+<p>Email: @_email</p>
+<p>Logged in: @_isLoggedIn</p>
+
+@code {
+    private string _email = string.Empty;
+    private bool _isLoggedIn;
+
+    protected override void OnInitialized()
+    {
+        _email = SessionService.GetUserEmail();
+        _isLoggedIn = Preferences.Get("is_logged_in", false);
+    }
+}
