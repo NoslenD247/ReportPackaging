@@ -33,6 +33,7 @@ namespace ReportPackaging
             builder.Services.AddScoped<ITempPackingService, TempPackingScanService>();
             builder.Services.AddScoped<ISew_FabricInboundScanService, Sew_FabricInboundScanService>();
             builder.Services.AddScoped<IFactoryService, FactoryService>();
+            builder.Services.AddScoped<ISewGetDataFromUserService, SewGetDataFromUserService>();
 
             //builder.Configuration.AddJsonFile("appsettings.json");
 #endif
