@@ -3,55 +3,35 @@ using Azure.AI.FormRecognizer.DocumentAnalysis;
 
 namespace ReportPackaging.Services
 {
-    public class AzureOcrService
+    /// <summary>
+    /// OCR Service for "REPORTE DE EMPAQUE" document.
+    /// Each document can have multiple PO sections, each with dynamic size columns.
+    /// </summary>
+    public class AzurePackingReportService
     {
         private readonly string _endpoint;
         private readonly string _apiKey;
 
-        // Nombres posibles de cada columna (Azure puede variar mayúsculas/tildes)
-        private static readonly string[] ColFecha = { "fecha" };
-        private static readonly string[] ColCodigo = { "codigo", "código", "cod" };
-        private static readonly string[] ColBuyer = { "buyer" };
-        private static readonly string[] ColStyle = { "style", "stile" };
-        private static readonly string[] ColPO = { "po#", "po" };
-        private static readonly string[] ColColor = { "color" };
-        private static readonly string[] ColOrden = { "orden" };
-        //private static readonly string[] ColXS = { "xs" };
-        //private static readonly string[] ColS = { "s" };
-        //private static readonly string[] ColM = { "m" };
-        private static readonly string[] ColXS = { "xs", "6/8 xs" };
-        private static readonly string[] ColS = { "s", "10/12 s" };
-        private static readonly string[] ColM = { "m", "14/16 m" };
-        private static readonly string[] ColL = { "l" };
-        private static readonly string[] ColXL = { "xl" };
-        private static readonly string[] ColXL2 = { "2xl", "xl2" };
-        private static readonly string[] ColXL3 = { "3xl", "xl3" };
-        private static readonly string[] ColTotalHoy = { "total hoy", "totalhoy", "total" };
-        private static readonly string[] ColAcumulado = { "acumulado" };
-        private static readonly string[] ColBalance = { "balance" };
-
-        public AzureOcrService(string endpoint, string apiKey)
+        public AzurePackingReportService(string endpoint, string apiKey)
         {
             _endpoint = endpoint;
             _apiKey = apiKey;
         }
 
-        public async Task<ReportData> AnalyzeReportAsync(Stream imageStream)
+        public async Task<PackingReportData> AnalyzeAsync(Stream imageStream)
         {
             try
             {
                 var credential = new AzureKeyCredential(_apiKey);
                 var client = new DocumentAnalysisClient(new Uri(_endpoint), credential);
 
-                System.Diagnostics.Debug.WriteLine("[AzureOCR] Analizando con prebuilt-layout...");
+                System.Diagnostics.Debug.WriteLine("[PackingOCR] Analyzing...");
 
                 var operation = await client.AnalyzeDocumentAsync(
                     WaitUntil.Completed, "prebuilt-layout", imageStream);
 
                 var result = operation.Value;
-                var reportData = new ReportData();
-
-                System.Diagnostics.Debug.WriteLine($"[AzureOCR] Tablas detectadas: {result.Tables.Count}");
+                var reportData = new PackingReportData();
 
                 if (result.Pages?.Count > 0)
                 {
@@ -60,125 +40,261 @@ namespace ReportPackaging.Services
                         .Select(l => l.Content.Trim())
                         .ToList();
 
-                    for (int i = 0; i < lines.Count; i++)
-                    {
-                        if (lines[i].ToLowerInvariant().StartsWith("fecha") && i + 1 < lines.Count)
-                        {
-                            reportData.Fecha = lines[i + 1];
-                            break;
-                        }
-                    }
+                    foreach (var l in lines)
+                        System.Diagnostics.Debug.WriteLine($"  LINE: '{l}'");
+
+                    ExtractFromLines(lines, reportData);
                 }
 
-                foreach (var table in result.Tables)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[AzureOCR] Tabla: {table.RowCount} filas x {table.ColumnCount} columnas");
-
-                    // 1. Leer encabezados (fila 0)
-                    var headers = new Dictionary<int, string>();
-                    var fila0 = new Dictionary<int, string>();
-                    var fila1 = new Dictionary<int, string>();
-                    foreach (var cell in table.Cells)
-                    {
-                        if (cell.RowIndex == 0)
-                            fila0[cell.ColumnIndex] = cell.Content.Trim();
-                        else if (cell.RowIndex == 1)
-                            fila1[cell.ColumnIndex] = cell.Content.Trim();
-                    }
-
-                    foreach (var kv in fila0)
-                    {
-                        var parte1 = kv.Value;
-                        var parte2 = fila1.TryGetValue(kv.Key, out var v) ? v : string.Empty;
-
-                        headers[kv.Key] = string.IsNullOrWhiteSpace(parte2)
-                            ? parte1.ToLowerInvariant()
-                            : $"{parte1} {parte2}".ToLowerInvariant().Trim();
-
-                        System.Diagnostics.Debug.WriteLine($"[AzureOCR] Header col {kv.Key}: '{headers[kv.Key]}'");
-                    }
-
-                    // Verificar que esta tabla tiene al menos una columna que nos sirva
-                    bool esTablaRelevante = headers.Values.Any(h =>
-                        ColFecha.Contains(h) || ColBuyer.Contains(h) ||
-                        ColStyle.Contains(h) || ColPO.Contains(h));
-
-                    if (!esTablaRelevante)
-                    {
-                        System.Diagnostics.Debug.WriteLine("[AzureOCR] Tabla ignorada, no parece ser el reporte.");
-                        continue;
-                    }
-
-                    // 2. Agrupar celdas por fila
-                    var rowCells = new Dictionary<int, Dictionary<int, string>>();
-                    foreach (var cell in table.Cells)
-                    {
-                        if (cell.RowIndex == 0 || cell.RowIndex == 1) continue;// skip header
-                        if (!rowCells.ContainsKey(cell.RowIndex))
-                            rowCells[cell.RowIndex] = new Dictionary<int, string>();
-                        rowCells[cell.RowIndex][cell.ColumnIndex] = cell.Content.Trim();
-                    }
-
-                    // 3. Mapear cada fila a ReportRow
-                    foreach (var rowKv in rowCells.OrderBy(r => r.Key))
-                    {
-                        var cells = rowKv.Value;
-                        var row = new ReportRow();
-
-                        foreach (var headerKv in headers)
-                        {
-                            var colIdx = headerKv.Key;
-                            var headerName = headerKv.Value;
-                            var value = cells.TryGetValue(colIdx, out var v) ? v : string.Empty;
-
-                            if (Match(headerName, ColCodigo)) row.Codigo = value;
-                            else if (Match(headerName, ColBuyer)) row.Buyer = value;
-                            else if (Match(headerName, ColStyle)) row.Style = value;
-                            else if (Match(headerName, ColPO)) row.PO = value;
-                            else if (Match(headerName, ColColor)) row.Color = value;
-                            else if (Match(headerName, ColOrden)) row.Orden = value;
-                            else if (Match(headerName, ColXS)) row.XS = ParseDecimal(value);
-                            else if (Match(headerName, ColS)) row.S = ParseDecimal(value);
-                            else if (Match(headerName, ColM)) row.M = ParseDecimal(value);
-                            else if (Match(headerName, ColL)) row.L = ParseDecimal(value);
-                            else if (Match(headerName, ColXL)) row.XL = ParseDecimal(value);
-                            else if (Match(headerName, ColXL2)) row.XL2 = ParseDecimal(value);
-                            else if (Match(headerName, ColXL3)) row.XL3 = ParseDecimal(value);
-                            else if (Match(headerName, ColTotalHoy)) row.TotalHoy = ParseDecimal(value);
-                            else if (Match(headerName, ColAcumulado)) row.Acumulado = ParseDecimal(value);
-                            else if (Match(headerName, ColBalance)) row.Balance = ParseDecimal(value);
-                        }
-
-                        // Solo agregar si la fila tiene algo útil
-                        if (!string.IsNullOrEmpty(row.Buyer) || row.TotalHoy > 0 || !string.IsNullOrEmpty(row.Style))
-                        {
-                            reportData.Rows.Add(row);
-                        }
-                    }
-                }
-
-                System.Diagnostics.Debug.WriteLine($"[AzureOCR] Total filas extraídas: {reportData.Rows.Count}");
+                System.Diagnostics.Debug.WriteLine($"[PackingOCR] Sections extracted: {reportData.Sections.Count}");
                 return reportData;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[AzureOCR] Error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[PackingOCR] Error: {ex.Message}");
                 throw;
             }
         }
 
-        private bool Match(string header, string[] options)
-            => options.Any(o => header.Equals(o, StringComparison.OrdinalIgnoreCase));
+        private void ExtractFromLines(List<string> lines, PackingReportData data)
+        {
+            var n = lines.Select(l => l.Trim()).ToList();
+
+            // ── Global header ─────────────────────────────────────────────────
+            for (int i = 0; i < n.Count; i++)
+            {
+                var low = n[i].ToLowerInvariant();
+
+                if (string.IsNullOrWhiteSpace(data.FabricaName) && i == 0)
+                {
+                    data.FabricaName = n[i];
+                    continue;
+                }
+
+                if (low.StartsWith("fecha") && string.IsNullOrWhiteSpace(data.Fecha))
+                {
+                    var afterColon = AfterColon(n[i]);
+                    data.Fecha = !string.IsNullOrWhiteSpace(afterColon)
+                        ? afterColon
+                        : (i + 1 < n.Count ? n[i + 1] : string.Empty);
+                    continue;
+                }
+            }
+
+            // ── Split into sections by P.O. ───────────────────────────────────
+            var sectionStartIndices = new List<int>();
+            for (int i = 0; i < n.Count; i++)
+            {
+                if (n[i].ToLowerInvariant().StartsWith("p.o"))
+                    sectionStartIndices.Add(i);
+            }
+
+            for (int s = 0; s < sectionStartIndices.Count; s++)
+            {
+                int from = sectionStartIndices[s];
+                int to = s + 1 < sectionStartIndices.Count
+                    ? sectionStartIndices[s + 1]
+                    : n.Count;
+
+                var sectionLines = n.Skip(from).Take(to - from).ToList();
+                var section = ParseSection(sectionLines);
+                if (section != null)
+                    data.Sections.Add(section);
+            }
+        }
+
+        private PackingSection? ParseSection(List<string> lines)
+        {
+            var section = new PackingSection();
+            var n = lines.Select(l => l.Trim()).ToList();
+
+            for (int i = 0; i < n.Count; i++)
+            {
+                var raw = n[i];
+                var low = raw.ToLowerInvariant();
+
+                // P.O
+                if (low.StartsWith("p.o") && string.IsNullOrWhiteSpace(section.PO))
+                {
+                    section.PO = AfterColon(raw);
+                    if (string.IsNullOrWhiteSpace(section.PO) && i + 1 < n.Count)
+                        section.PO = n[i + 1];
+                    System.Diagnostics.Debug.WriteLine($"[PackingOCR] PO: {section.PO}");
+                    continue;
+                }
+
+                // STYLE
+                if (low.StartsWith("style") && string.IsNullOrWhiteSpace(section.Style))
+                {
+                    section.Style = AfterColon(raw);
+                    if (string.IsNullOrWhiteSpace(section.Style) && i + 1 < n.Count)
+                        section.Style = n[i + 1];
+                    System.Diagnostics.Debug.WriteLine($"[PackingOCR] Style: {section.Style}");
+                    continue;
+                }
+
+                // FILE
+                if (low.StartsWith("file") && string.IsNullOrWhiteSpace(section.File))
+                {
+                    section.File = AfterColon(raw);
+                    if (string.IsNullOrWhiteSpace(section.File) && i + 1 < n.Count)
+                        section.File = n[i + 1];
+                    System.Diagnostics.Debug.WriteLine($"[PackingOCR] File: {section.File}");
+                    continue;
+                }
+
+                // CLIENT
+                if (low.StartsWith("client") && string.IsNullOrWhiteSpace(section.Client))
+                {
+                    section.Client = AfterColon(raw);
+                    if (string.IsNullOrWhiteSpace(section.Client) && i + 1 < n.Count)
+                        section.Client = n[i + 1];
+                    System.Diagnostics.Debug.WriteLine($"[PackingOCR] Client: {section.Client}");
+                    continue;
+                }
+
+                // Detect size headers row: "Color Orden XS S M L XL 2XL TOTAL"
+                // The row that contains "color" and "orden" and "total" marks the header
+                if (low == "color" || low == "orden")
+                {
+                    // Find the full header row — collect consecutive non-data lines
+                    // Headers: Color, Orden, [sizes...], TOTAL
+                    var headerCols = new List<string>();
+                    int headerStart = i;
+
+                    // Step back to find "Color" if we're on "Orden"
+                    if (low == "orden" && i > 0 && n[i - 1].ToLowerInvariant() == "color")
+                        headerStart = i - 1;
+                    else if (low == "color")
+                        headerStart = i;
+
+                    // Collect headers until we hit "TOTAL"
+                    for (int j = headerStart; j < n.Count; j++)
+                    {
+                        headerCols.Add(n[j]);
+                        if (n[j].ToLowerInvariant() == "total") break;
+                    }
+
+                    section.SizeHeaders = headerCols
+                        .Where(h => !h.ToLowerInvariant().StartsWith("color") &&
+                                    !h.ToLowerInvariant().StartsWith("orden"))
+                        .ToList();
+
+                    System.Diagnostics.Debug.WriteLine($"[PackingOCR] Size headers: {string.Join(", ", section.SizeHeaders)}");
+
+                    // Data rows start after headers
+                    // The next lines are: Color value, then quantities, then total
+                    int dataStart = headerStart + headerCols.Count;
+
+                    // Parse data rows — each row: color name + N quantities + total
+                    int totalCols = section.SizeHeaders.Count; // includes TOTAL
+                    int sizeCols = totalCols - 1;             // excludes TOTAL
+                    int colsPerRow = 1 + sizeCols + 1;          // color + sizes + total
+
+                    int j2 = dataStart;
+                    while (j2 < n.Count)
+                    {
+                        // First value is color name
+                        var colorName = n[j2];
+                        if (string.IsNullOrWhiteSpace(colorName) || IsKnownLabel(colorName))
+                        { j2++; continue; }
+
+                        var row = new PackingRow();
+                        row.Color = colorName;
+                        row.Orden = string.Empty;
+
+                        j2++;
+
+                        // Next values are quantities (sizeCols) + total
+                        var sizeNames = section.SizeHeaders.Take(sizeCols).ToList();
+                        var quantities = new List<string>();
+
+                        for (int k = 0; k < sizeCols && j2 < n.Count; k++, j2++)
+                            quantities.Add(n[j2]);
+
+                        // Total
+                        if (j2 < n.Count)
+                        {
+                            row.Total = ParseDecimal(n[j2]);
+                            j2++;
+                        }
+
+                        // Map sizes to quantities
+                        for (int k = 0; k < sizeNames.Count && k < quantities.Count; k++)
+                        {
+                            row.Sizes[sizeNames[k]] = ParseDecimal(quantities[k]);
+                        }
+
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[PackingOCR] Row — Color:{row.Color} Total:{row.Total} Sizes:{string.Join("|", row.Sizes.Select(kv => $"{kv.Key}={kv.Value}"))}");
+
+                        section.Rows.Add(row);
+                    }
+
+                    break; // Done with this section
+                }
+            }
+
+            return string.IsNullOrWhiteSpace(section.PO) ? null : section;
+        }
+
+        private bool IsKnownLabel(string value)
+        {
+            var low = value.ToLowerInvariant();
+            return low.StartsWith("p.o") || low.StartsWith("style") ||
+                   low.StartsWith("file") || low.StartsWith("client") ||
+                   low.StartsWith("color") || low.StartsWith("orden") ||
+                   low.StartsWith("total") || low.StartsWith("reporte") ||
+                   low.StartsWith("fecha");
+        }
+
+        private string AfterColon(string line)
+        {
+            var idx = line.IndexOf(':');
+            return idx >= 0 ? line[(idx + 1)..].Trim() : string.Empty;
+        }
 
         private decimal ParseDecimal(string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return 0;
             value = System.Text.RegularExpressions.Regex
-                .Replace(value, @"[^\d\.,]", "").Replace(",", ".");
+                .Replace(value, @"[^\d\.,]", "").Replace(",", "");
             return decimal.TryParse(value,
                 System.Globalization.NumberStyles.Any,
                 System.Globalization.CultureInfo.InvariantCulture,
                 out var result) ? result : 0;
         }
+    }
+
+    // ── Data Models ───────────────────────────────────────────────────────────
+
+    public class PackingReportData
+    {
+        public string FabricaName { get; set; } = string.Empty;
+        public string Fecha { get; set; } = string.Empty;
+        public List<PackingSection> Sections { get; set; } = new();
+    }
+
+    public class PackingSection
+    {
+        public string PO { get; set; } = string.Empty;
+        public string Style { get; set; } = string.Empty;
+        public string File { get; set; } = string.Empty;
+        public string Client { get; set; } = string.Empty;
+
+        // Dynamic size column names e.g. ["XXS","XS","S","M","L","XL","2XL","TOTAL"]
+        public List<string> SizeHeaders { get; set; } = new();
+
+        public List<PackingRow> Rows { get; set; } = new();
+    }
+
+    public class PackingRow
+    {
+        public string Color { get; set; } = string.Empty;
+        public string Orden { get; set; } = string.Empty;
+        public decimal Total { get; set; } = 0;
+
+        // Dynamic: key = size name, value = quantity
+        public Dictionary<string, decimal> Sizes { get; set; } = new();
     }
 }

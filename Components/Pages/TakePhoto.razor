@@ -4,16 +4,16 @@
 @using ReportPackaging.Data.Sew.IService
 @using ReportPackaging.Data.Sew.Service
 @using ReportPackaging.Data.Sew.DTO
-
 @using System.Text.Json
 
-@inject ITempPackingService TempPackingService;
-<div style="font-family: sans-serif; max-width: 100%;">
+@inject ITempPackingService TempPackingService
 
-    <h3>📷 Escanear Reporte</h3>
+<div style="font-family: sans-serif; max-width: 100%; padding: 16px;">
+
+    <h3>📷 Escanear Reporte de Empaque</h3>
 
     <!-- Botones de captura -->
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:25px;">
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;">
         <button @onclick="OnTakePhotoClicked" disabled="@isLoading"
                 style="background:#0078d4; color:white; padding:12px 20px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
             📷 Tomar Foto
@@ -40,72 +40,117 @@
         </div>
     }
 
-    <!-- Tabla editable -->
-    @if (rows.Count > 0)
-
+    <!-- Resultado jerárquico -->
+    @if (reportData != null && reportData.Sections.Count > 0)
     {
-        <div style="margin-top:10px;">
-            <h4>✅ @rows.Count fila(s) detectadas — edita si es necesario</h4>
-
-            <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+        <!-- Header global -->
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+            <span style="font-weight:700; color:#0078d4; font-size:15px;">🏭 @reportData.FabricaName</span>
+            <div style="display:flex; align-items:center; gap:6px;">
                 <label style="font-size:13px; color:#555; font-weight:600;">📅 Fecha:</label>
-                <input style="@inputStyle" @bind="fechaReporte" />
+                <input style="@inputStyle; width:110px;" @bind="reportData.Fecha" />
             </div>
-
-            <div style="overflow-x:auto; border:1px solid #ddd; border-radius:8px;">
-                <table style="border-collapse:collapse; width:100%; font-size:13px;">
-                    <thead>
-                        <tr style="background:#0078d4; color:white;">
-                            <th style="@thStyle">Buyer</th>
-                            <th style="@thStyle">Style</th>
-                            <th style="@thStyle">PO#</th>
-                            <th style="@thStyle">Color</th>
-                            <th style="@thStyle">🗑️</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var row in rows)
-                        {
-                            var r = row;
-                            <tr style="border-bottom:1px solid #eee;">
-                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Buyer" /></td>
-                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Style" /></td>
-                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.PO" /></td>
-                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.Color" /></td>
-                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.XL2" /></td>
-                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.XL3" /></td>
-                                <td style="@tdStyle"><input style="@inputStyle" @bind="r.TotalHoy" /></td>
-                                <td style="@tdStyle; text-align:center;">
-                                    <button @onclick="() => EliminarFila(r)"
-                                            style="background:none; border:none; color:#e53935; font-size:16px; cursor:pointer;">
-                                        🗑️
-                                    </button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Botones de acción -->
-            <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
-                <button @onclick="AgregarFila"
-                        style="background:#6c757d; color:white; padding:10px 18px; border:none; border-radius:8px; cursor:pointer;">
-                    ➕ Agregar Fila
-                </button>
-                <button @onclick="GuardarDatos" disabled="@isGuardando"
-                        style="background:#28a745; color:white; padding:10px 24px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
-                    💾 @(isGuardando ? "Guardando..." : "Guardar en DB")
-                </button>
-            </div>
-
-            @if (!string.IsNullOrEmpty(mensajeGuardado))
-            {
-                <div style="margin-top:12px; padding:12px; background:#e8f5e9; border-radius:8px; color:#2e7d32;">
-                    ✅ @mensajeGuardado
-                </div>
-            }
         </div>
+
+        <!-- Secciones -->
+        @foreach (var section in reportData.Sections)
+        {
+            <div style="border:1px solid #ddd; border-radius:10px; margin-bottom:20px; overflow:hidden;">
+
+                <!-- Header de sección -->
+                <div style="background:#f0f7ff; padding:10px 14px; border-bottom:1px solid #ddd;">
+                    <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
+                        <div>
+                            <label style="@labelStyle">P.O.</label>
+                            <input style="@inputStyle; width:120px;" @bind="section.PO" />
+                        </div>
+                        <div>
+                            <label style="@labelStyle">Style</label>
+                            <input style="@inputStyle; width:100px;" @bind="section.Style" />
+                        </div>
+                        <div>
+                            <label style="@labelStyle">File</label>
+                            <input style="@inputStyle; width:120px;" @bind="section.File" />
+                        </div>
+                        <div>
+                            <label style="@labelStyle">Client</label>
+                            <input style="@inputStyle; width:100px;" @bind="section.Client" />
+                        </div>
+                        <button @onclick="() => section.Rows.Add(new PackingRow())"
+                                style="margin-left:auto; background:#6c757d; color:white; padding:6px 12px; border:none; border-radius:6px; font-size:12px; cursor:pointer;">
+                            ➕ Fila
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tabla de filas de color -->
+                <div style="overflow-x:auto;">
+                    <table style="border-collapse:collapse; width:100%; font-size:13px;">
+                        <thead>
+                            <tr style="background:#e8f4fd;">
+                                <th style="@thStyle">Color</th>
+                                <th style="@thStyle">Orden</th>
+                                @foreach (var size in section.SizeHeaders.Where(h => !h.Equals("total", StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    <th style="@thStyle">@size</th>
+                                }
+                                <th style="@thStyle; color:#28a745;">Total</th>
+                                <th style="@thStyle">🗑️</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in section.Rows)
+                            {
+                                var r = row;
+                                <tr style="border-bottom:1px solid #eee;">
+                                    <td style="@tdStyle">
+                                        <input style="@inputStyle; width:90px;" @bind="r.Color" />
+                                    </td>
+                                    <td style="@tdStyle">
+                                        <input style="@inputStyle; width:70px;" @bind="r.Orden" />
+                                    </td>
+                                    @foreach (var size in section.SizeHeaders.Where(h => !h.Equals("total", StringComparison.OrdinalIgnoreCase)))
+                                    {
+                                        var s = size;
+                                        <td style="@tdStyle">
+                                            <input style="@inputNumStyle"
+                                                   value="@(r.Sizes.TryGetValue(s, out var v) ? v.ToString("0") : "0")"
+                                                   @onchange="e => UpdateSize(r, s, e.Value?.ToString())" />
+                                        </td>
+                                    }
+                                    <td style="@tdStyle">
+                                        <input style="@inputNumStyle; width:70px; font-weight:700; color:#28a745;"
+                                               value="@r.Total.ToString("0")"
+                                               @onchange="e => { if (decimal.TryParse(e.Value?.ToString(), out var t)) { r.Total = t; StateHasChanged(); } }" />
+                                    </td>
+                                    <td style="@tdStyle; text-align:center;">
+                                        <button @onclick="() => { section.Rows.Remove(r); StateHasChanged(); }"
+                                                style="background:none; border:none; color:#e53935; font-size:16px; cursor:pointer;">
+                                            🗑️
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <!-- Botones de acción -->
+        <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
+            <button @onclick="GuardarDatos" disabled="@isGuardando"
+                    style="background:#28a745; color:white; padding:10px 24px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
+                💾 @(isGuardando ? "Guardando..." : "Guardar en DB")
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(mensajeGuardado))
+        {
+            <div style="margin-top:12px; padding:12px; background:#e8f5e9; border-radius:8px; color:#2e7d32;">
+                ✅ @mensajeGuardado
+            </div>
+        }
     }
 
 </div>
@@ -116,13 +161,21 @@
     private bool isGuardando = false;
     private string errorMessage = string.Empty;
     private string mensajeGuardado = string.Empty;
-    private string fechaReporte = string.Empty;
-    private List<ReportRow> rows = new();
+    private PackingReportData? reportData = null;
 
-    private string thStyle = "padding:8px 10px; text-align:left; white-space:nowrap;";
+    private string thStyle = "padding:8px 10px; text-align:left; white-space:nowrap; font-weight:600;";
     private string tdStyle = "padding:4px 6px;";
-    private string inputStyle = "width:90px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:12px;";
-    private string inputStyleNum = "width:60px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:12px; text-align:right;";
+    private string inputStyle = "padding:4px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;";
+    private string inputNumStyle = "width:55px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:12px; text-align:right; box-sizing:border-box;";
+    private string labelStyle = "font-size:11px; color:#666; display:block; margin-bottom:2px;";
+
+    // ── Actualiza el tamaño y recalcula el total automáticamente ─────────────
+    private void UpdateSize(PackingRow row, string size, string? value)
+    {
+        row.Sizes[size] = decimal.TryParse(value, out var d) ? d : 0;
+        row.Total = row.Sizes.Values.Sum();
+        StateHasChanged();
+    }
 
     private async Task OnTakePhotoClicked()
     {
@@ -149,7 +202,7 @@
         {
             errorMessage = string.Empty;
             mensajeGuardado = string.Empty;
-            rows = new();
+            reportData = null;
             isLoading = true;
             StateHasChanged();
 
@@ -164,18 +217,15 @@
             }
 
             using var stream = await photo.OpenReadAsync();
-            using var memoryStream = new MemoryStream();
-            await stream.CopyToAsync(memoryStream);
-            memoryStream.Position = 0;
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            ms.Position = 0;
 
-            var azureService = new AzureOcrService(endpoint, apiKey);
-            var reportData = await azureService.AnalyzeReportAsync(memoryStream);
+            var service = new AzurePackingReportService(endpoint, apiKey);
+            reportData = await service.AnalyzeAsync(ms);
 
-            rows = reportData.Rows;
-            fechaReporte = reportData.Fecha;
-
-            if (rows.Count == 0)
-                errorMessage = "No se detectaron filas. Intenta con mejor iluminación.";
+            if (reportData.Sections.Count == 0)
+                errorMessage = "No se detectaron secciones. Intenta con mejor iluminación.";
         }
         catch (Exception ex)
         {
@@ -188,12 +238,9 @@
         }
     }
 
-    private void EliminarFila(ReportRow row) => rows.Remove(row);
-
-    private void AgregarFila() => rows.Add(new ReportRow());
-
     private async Task GuardarDatos()
     {
+        if (reportData == null) return;
         try
         {
             isGuardando = true;
@@ -204,36 +251,37 @@
             int guardados = 0;
             int fallidos = 0;
 
-            foreach (var row in rows)
+            foreach (var section in reportData.Sections)
             {
-                // Mapear ReportRow → Sew_TempPackingDTO
-                var dto = new TempPackingDTO
+                foreach (var row in section.Rows)
                 {
-                    Buyer = row.Buyer ?? string.Empty,
-                    Style = row.Style ?? string.Empty,
-                    Po = row.PO ?? string.Empty,
-                    Color = row.Color ?? string.Empty,
-                    Orden = row.Orden ?? string.Empty,
-                    Xs = (int)row.XS,
-                    S = (int)row.S,
-                    M = (int)row.M,
-                    L = (int)row.L,
-                    Xl = (int)row.XL,
-                    Xl2 = (int)row.XL2,
-                    Xl3 = (int)row.XL3,
-                    TodayTotal = (int)row.TotalHoy,
-                    ReportDate = fechaReporte,
-                };
+                    var dto = new TempPackingDTO
+                    {
+                        Buyer = section.Client ?? string.Empty,
+                        Style = section.Style ?? string.Empty,
+                        Po = section.PO ?? string.Empty,
+                        Color = row.Color ?? string.Empty,
+                        Orden = row.Orden ?? string.Empty,
+                        ReportDate = reportData.Fecha,
+                        TodayTotal = (int)row.Total,
+                        Xs = (int)(row.Sizes.TryGetValue("XS", out var xs) ? xs : 0),
+                        S = (int)(row.Sizes.TryGetValue("S", out var s) ? s : 0),
+                        M = (int)(row.Sizes.TryGetValue("M", out var m) ? m : 0),
+                        L = (int)(row.Sizes.TryGetValue("L", out var l) ? l : 0),
+                        Xl = (int)(row.Sizes.TryGetValue("XL", out var xl) ? xl : 0),
+                        Xl2 = (int)(row.Sizes.TryGetValue("2XL", out var xl2) ? xl2 : 0),
+                        Xl3 = (int)(row.Sizes.TryGetValue("3XL", out var xl3) ? xl3 : 0),
+                    };
 
-                var ok = await TempPackingService.InsertAsync(dto);
-                if (ok) guardados++;
-                else fallidos++;
+                    var ok = await TempPackingService.InsertAsync(dto);
+                    if (ok) guardados++;
+                    else fallidos++;
+                }
             }
 
-            if (fallidos == 0)
-                mensajeGuardado = $"✅ {guardados} fila(s) guardadas correctamente.";
-            else
-                mensajeGuardado = $"⚠️ {guardados} guardadas, {fallidos} fallidas. Revisa tu conexión.";
+            mensajeGuardado = fallidos == 0
+                ? $"{guardados} fila(s) guardadas correctamente."
+                : $"⚠️ {guardados} guardadas, {fallidos} fallidas.";
         }
         catch (Exception ex)
         {
