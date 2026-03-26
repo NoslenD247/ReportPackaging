@@ -2,18 +2,18 @@
 @using ReportPackaging.Services
 
 <h1>Hello, world!</h1>
-<p>Welcome to your new app.</p>
-
 <p>Email: @_email</p>
 <p>Logged in: @_isLoggedIn</p>
 
 @code {
     private string _email = string.Empty;
+    private string _token = string.Empty;
     private bool _isLoggedIn;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _email = SessionService.GetUserEmail();
         _isLoggedIn = Preferences.Get("is_logged_in", false);
+        _token = await SecureStorage.GetAsync("clerk_JWT") ?? "VACÍO";
     }
 }

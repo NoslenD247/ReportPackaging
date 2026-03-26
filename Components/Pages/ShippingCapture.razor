@@ -6,6 +6,7 @@
 @using ReportPackaging.Data.Sew.Service
 @using System.Text.Json
 
+@inject IBlobStorageService BlobStorageService
 @inject ISew_FabricInboundScanService FabricInboundScanService
 @inject IFactoryService FactoryService
 @inject ISewGetDataFromUserService SewGetDataFromUserService
@@ -25,21 +26,21 @@
 
                 <button @onclick="() => SeleccionarTemplate(1)"
                         style="background:white; border:2px solid #0078d4; border-radius:10px;
-                                   padding:14px 16px; text-align:left; cursor:pointer;">
+                                       padding:14px 16px; text-align:left; cursor:pointer;">
                     <div style="font-weight:700; color:#0078d4; font-size:14px;">📄 Textiles Solafe</div>
                     <div style="font-size:12px; color:#777; margin-top:3px;">ENVIO DE MERCADERÍAS</div>
                 </button>
 
                 <button @onclick="() => SeleccionarTemplate(2)"
                         style="background:white; border:2px solid #107c41; border-radius:10px;
-                                   padding:14px 16px; text-align:left; cursor:pointer;">
+                                       padding:14px 16px; text-align:left; cursor:pointer;">
                     <div style="font-weight:700; color:#107c41; font-size:14px;">📄 C.R. Textil</div>
                     <div style="font-size:12px; color:#777; margin-top:3px;">ENVIO DE MERCADERÍAS — C.R. Textil, S.A.</div>
                 </button>
 
                 <button @onclick="() => SeleccionarTemplate(3)"
                         style="background:white; border:2px solid #e53935; border-radius:10px;
-                                   padding:14px 16px; text-align:left; cursor:pointer;">
+                                       padding:14px 16px; text-align:left; cursor:pointer;">
                     <div style="font-weight:700; color:#e53935; font-size:14px;">📄 Apparel Links</div>
                     <div style="font-size:12px; color:#777; margin-top:3px;">REPORTE DE PACKING LIST BODEGA DE TELA</div>
                 </button>
@@ -51,13 +52,13 @@
     {
         <!-- Header con template seleccionado -->
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;
-                        padding:10px 14px; background:#f0f7ff; border-radius:8px; border:1px solid #0078d4;">
+                            padding:10px 14px; background:#f0f7ff; border-radius:8px; border:1px solid #0078d4;">
             <span style="font-size:13px; color:#0078d4; font-weight:600;">
                 📄 @NombreTemplate
             </span>
             <button @onclick="CambiarTemplate"
                     style="margin-left:auto; background:none; border:1px solid #0078d4;
-                               color:#0078d4; border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer;">
+                                   color:#0078d4; border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer;">
                 Cambiar
             </button>
         </div>
@@ -73,6 +74,17 @@
                 🖼️ Subir Imagen
             </button>
         </div>
+
+        <!-- Preview de imagen capturada -->
+        @if (!string.IsNullOrEmpty(capturedImageBase64))
+        {
+            <div style="margin-bottom:16px; text-align:center;">
+                <img src="data:@(capturedImageContentType);base64,@capturedImageBase64"
+                     alt="Documento capturado"
+                     style="max-width:100%; max-height:200px; border-radius:8px; border:2px solid #0078d4;" />
+                <div style="font-size:11px; color:#888; margin-top:4px;">Vista previa del documento</div>
+            </div>
+        }
 
         <!-- Loading -->
         @if (isLoading)
@@ -181,16 +193,16 @@
                         <div style="display:flex; gap:0; margin-bottom:6px;">
                             <button @onclick="() => SeleccionarTipoYards(true)"
                                     style="flex:1; padding:8px; border:2px solid @(isBody ? "#0078d4" : "#ccc");
-                                                   background:@(isBody ? "#0078d4" : "white");
-                                                   color:@(isBody ? "white" : "#333");
-                                                   border-radius:6px 0 0 6px; cursor:pointer; font-weight:600; font-size:13px;">
+                                                           background:@(isBody ? "#0078d4" : "white");
+                                                           color:@(isBody ? "white" : "#333");
+                                                           border-radius:6px 0 0 6px; cursor:pointer; font-weight:600; font-size:13px;">
                                 🧴 Body
                             </button>
                             <button @onclick="() => SeleccionarTipoYards(false)"
                                     style="flex:1; padding:8px; border:2px solid @(!isBody ? "#0078d4" : "#ccc");
-                                                   background:@(!isBody ? "#0078d4" : "white");
-                                                   color:@(!isBody ? "white" : "#333");
-                                                   border-radius:0 6px 6px 0; cursor:pointer; font-weight:600; font-size:13px;">
+                                                           background:@(!isBody ? "#0078d4" : "white");
+                                                           color:@(!isBody ? "white" : "#333");
+                                                           border-radius:0 6px 6px 0; cursor:pointer; font-weight:600; font-size:13px;">
                                 🧶 Rib
                             </button>
                         </div>
@@ -240,6 +252,13 @@
     private string noEnvio = string.Empty;
     private ShippingData? shippingData = null;
 
+    // ═══ Variables para imagen/blob ═══
+    private string? imageUrl = null;
+    private MemoryStream? capturedImageStream = null;
+    private string? capturedImageContentType = null;
+    private string? capturedImageFileName = null;
+    private string? capturedImageBase64 = null;  // para preview en UI
+
     private int selectedBuyerId = 0;
     private int selectedSupplierId = 0;
 
@@ -248,7 +267,6 @@
 
     private List<BuyerDTO> buyers = new();
     private List<SupplierDTO> suppliers = new();
-    private Sew_GetDataFromUserDTO? currentUser = null;
 
     private string inputStyle = "width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box;";
     private string labelStyle = "font-size:11px; color:#666; display:block; margin-bottom:3px;";
@@ -261,19 +279,10 @@
         _ => string.Empty
     };
 
-    protected override async Task OnInitializedAsync()
-    {
-        _email = SessionService.GetUserEmail();
-        _isLoggedIn = Preferences.Get("is_logged_in", false);
-        await CargarListas();
-    }
-
     private async Task CargarListas()
     {
         buyers = (await FactoryService.GetBuyersByCenter(14)).ToList();
         suppliers = (await FactoryService.GetSuppliersByCenter(14)).ToList();
-        currentUser = (await SewGetDataFromUserService.GetAllAsync(_email)).FirstOrDefault();
-        Console.WriteLine($"Id:{currentUser.ID} | UserName:{currentUser.UserName} | Email:{currentUser.Email} | NameEn:{currentUser.NameEn} | CenterId:{currentUser.CenterId}");
     }
 
     private void SeleccionarTemplate(int template)
@@ -348,6 +357,8 @@
             isBody = true;
             selectedBuyerId = 0;
             selectedSupplierId = 0;
+            imageUrl = null;
+            capturedImageBase64 = null;
             isLoading = true;
             StateHasChanged();
 
@@ -365,6 +376,20 @@
             using var memoryStream = new MemoryStream();
             await stream.CopyToAsync(memoryStream);
             memoryStream.Position = 0;
+
+            // ═══ Guardar copia para subir al blob después ═══
+            capturedImageStream?.Dispose();  // limpiar anterior si existe
+            capturedImageStream = new MemoryStream();
+            await memoryStream.CopyToAsync(capturedImageStream);
+            capturedImageStream.Position = 0;
+            memoryStream.Position = 0;  // resetear para OCR
+
+            capturedImageContentType = photo.ContentType ?? "image/jpeg";
+            capturedImageFileName = photo.FileName;
+
+            // Generar base64 para preview en la UI
+            capturedImageBase64 = Convert.ToBase64String(capturedImageStream.ToArray());
+            // ═══ Fin copia blob ═══
 
             shippingData = templateSeleccionado switch
             {
@@ -396,6 +421,26 @@
             mensajeGuardado = string.Empty;
             StateHasChanged();
 
+            // ═══ Subir imagen al blob storage ═══
+            if (capturedImageStream != null && capturedImageStream.Length > 0)
+            {
+                capturedImageStream.Position = 0;
+                var cleanName = (capturedImageFileName ?? $"scan_{DateTime.Now:yyyyMMddHHmmss}.jpg")
+                                .Replace(" ", "");
+                // Nombre único para evitar colisiones
+                var uniqueName = $"{DateTime.Now:yyyyMMddHHmmss}_{cleanName}";
+                var blobPath = $"Sew/FabricInboundScans/{uniqueName}";
+
+                imageUrl = await BlobStorageService.UploadFileToBlobAsync(
+                    blobPath,
+                    capturedImageContentType ?? "image/jpeg",
+                    capturedImageStream
+                );
+
+                System.Diagnostics.Debug.WriteLine($"[ShippingCapture] Imagen subida: {imageUrl}");
+            }
+            // ═══ Fin subida blob ═══
+
             DateTime entryDate = DateTime.Now;
             if (int.TryParse(shippingData.Dia, out int dia) &&
                 int.TryParse(shippingData.Mes, out int mes) &&
@@ -426,12 +471,13 @@
                 SupplierId = selectedSupplierId,
                 BuyerId = selectedBuyerId,
                 Rack = shippingData.Rack ?? string.Empty,
+                ImageUrl = imageUrl ?? string.Empty,  // ← NUEVO
                 CreatedDate = DateTime.Now,
                 LastUpdatedDate = DateTime.Now,
-                CreatedByUserName = currentUser.UserName,
-                LastUpdatedByUserId = currentUser.ID,
-                LastUpdatedByUserNameEn = currentUser.NameEn,
-                CenterId = currentUser.CenterId
+                CreatedByUserName = "TestUser26",
+                LastUpdatedByUserId = "TestUser26",
+                LastUpdatedByUserNameEn = "TestUser26",
+                CenterId = 26
             };
 
             var ok = await FabricInboundScanService.CreateFabricInboundScan(dto);

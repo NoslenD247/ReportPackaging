@@ -3,7 +3,35 @@
 @using ReportPackaging.Helpers
 @using ReportPackaging.Services
 @using System.Text.Json
+@using System.Text.Json.Serialization
 @inject NavigationManager Navigation
+
+@if (_checking)
+{
+    <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#F3F4F6;">
+        <p style="color:#6B7280;">Cargando...</p>
+    </div>
+}
+else
+{
+    <div class="login-container">
+        <div class="login-card">
+            <h1 class="login-title">Auth Demo</h1>
+            <p class="login-subtitle">Ingreso corporativo seguro</p>
+
+            <button class="login-btn" @onclick="OnLoginClicked" disabled="@_isLoading">
+                @(_isLoading ? "Autenticando..." : "Iniciar Sesión (Clerk OTP)")
+            </button>
+
+            <p class="login-status">@_statusMessage</p>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <p class="login-error">@_errorMessage</p>
+            }
+        </div>
+    </div>
+}
 
 <div class="login-container">
     <div class="login-card">
@@ -31,13 +59,16 @@
     private bool _isLoading = false;
     private string _statusMessage = "Esperando autenticación...";
     private string _errorMessage = string.Empty;
+    private bool _checking = true;
 
     protected override void OnInitialized()
     {
         if (Preferences.Get("is_logged_in", false))
         {
             Navigation.NavigateTo("/home");
+            return; // ← importante el return
         }
+        _checking = false; // ← solo llega aquí si NO está loggeado
     }
 
     private async Task OnLoginClicked()
@@ -57,7 +88,7 @@
                              $"?client_id={AuthConfig.ClientId}" +
                              $"&redirect_uri={AuthConfig.RedirectUri}" +
                              $"&response_type=code" +
-                             $"&scope=email profile offline_access" +
+                             $"&scope=openid email profile offline_access" +
                              $"&code_challenge={codeChallenge}" +
                              $"&code_challenge_method=S256";
 
@@ -70,18 +101,27 @@
             {
                 _statusMessage = "Intercambiando código...";
 
-                // 4. Intercambiar código por Token JWT
-                string? token = await ExchangeCodeForTokenAsync(result.Properties["code"], codeVerifier);
+                // 4. Intercambiar código por TokenResponse completo
+                var token = await ExchangeCodeForTokenAsync(result.Properties["code"], codeVerifier);
 
-                if (!string.IsNullOrEmpty(token))
+                System.Diagnostics.Debug.WriteLine($"[Login] AccessToken: {token?.AccessToken ?? "NULL"}");
+                System.Diagnostics.Debug.WriteLine($"[Login] IdToken: {token?.IdToken ?? "NULL"}");
+
+                if (token != null && !string.IsNullOrEmpty(token.AccessToken))
                 {
-                    // 5. Obtener email desde Clerk
-                    string? email = await GetUserEmailFromClerk(token);
+                    // 5. Obtener email desde Clerk usando el AccessToken
+                    string? email = await GetUserEmailFromClerk(token.AccessToken);
 
                     if (!string.IsNullOrEmpty(email))
                     {
-                        // 6. Guardar sesión de forma segura
-                        await SessionService.SaveSessionAsync(token, email);
+                        // 6. Guardar sesión
+                        await SessionService.SaveSessionAsync(token.AccessToken, email);
+                        await SecureStorage.SetAsync("clerk_JWT", token.IdToken);
+
+                        var verificacion = await SecureStorage.GetAsync("clerk_JWT");
+                        System.Diagnostics.Debug.WriteLine($"[Login] clerk_JWT guardado: {verificacion ?? "NULL"}");
+                        await SecureStorage.SetAsync("login_type", "clerk");
+
                         _statusMessage = "Autenticado correctamente ✅";
                         Navigation.NavigateTo("/home", forceLoad: true);
                     }
@@ -90,6 +130,11 @@
                         _errorMessage = "No se pudo recuperar el correo del usuario.";
                         _statusMessage = "Error en login.";
                     }
+                }
+                else
+                {
+                    _errorMessage = "No se pudo obtener el token. Intenta de nuevo.";
+                    _statusMessage = "Error en login.";
                 }
             }
         }
@@ -104,24 +149,24 @@
         }
     }
 
-    private async Task<string?> ExchangeCodeForTokenAsync(string code, string codeVerifier)
+    private async Task<TokenResponse?> ExchangeCodeForTokenAsync(string code, string codeVerifier)
     {
         var content = new FormUrlEncodedContent(new[]
         {
-            new KeyValuePair<string, string>("grant_type",    "authorization_code"),
-            new KeyValuePair<string, string>("client_id",     AuthConfig.ClientId),
-            new KeyValuePair<string, string>("code",          code),
-            new KeyValuePair<string, string>("redirect_uri",  AuthConfig.RedirectUri),
-            new KeyValuePair<string, string>("code_verifier", codeVerifier)
-        });
+        new KeyValuePair<string, string>("grant_type",    "authorization_code"),
+        new KeyValuePair<string, string>("client_id",     AuthConfig.ClientId),
+        new KeyValuePair<string, string>("code",          code),
+        new KeyValuePair<string, string>("redirect_uri",  AuthConfig.RedirectUri),
+        new KeyValuePair<string, string>("code_verifier", codeVerifier)
+    });
 
         var response = await _httpClient.PostAsync(AuthConfig.TokenUrl, content);
-        if (!response.IsSuccessStatusCode)
-            return null;
-
         var json = await response.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(json);
-        return doc.RootElement.GetProperty("access_token").GetString();
+
+        System.Diagnostics.Debug.WriteLine($"[Login] Token JSON: {json}");
+
+        if (!response.IsSuccessStatusCode) return null;
+        return JsonSerializer.Deserialize<TokenResponse>(json);
     }
 
     private async Task<string?> GetUserEmailFromClerk(string accessToken)
@@ -131,8 +176,7 @@
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
         var response = await _httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-            return null;
+        if (!response.IsSuccessStatusCode) return null;
 
         var json = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(json);
@@ -140,6 +184,19 @@
         return doc.RootElement.TryGetProperty("email", out var emailElement)
             ? emailElement.GetString()
             : null;
+    }
+
+    // ── Token Response Model ──────────────────────────────────────────────────
+    public class TokenResponse
+    {
+        [JsonPropertyName("access_token")]
+        public string AccessToken { get; set; } = string.Empty;
+
+        [JsonPropertyName("id_token")]
+        public string IdToken { get; set; } = string.Empty;
+
+        [JsonPropertyName("token_type")]
+        public string TokenType { get; set; } = string.Empty;
     }
 }
 

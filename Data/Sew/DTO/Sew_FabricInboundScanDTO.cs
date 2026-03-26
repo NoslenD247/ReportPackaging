@@ -17,7 +17,9 @@
         public int SupplierId { get; set; }
         public int BuyerId { get; set; }
         public string Rack { get; set; } = string.Empty;
-        public int CenterId { get; set; } = 14;
+        public int CenterId { get; set; } = 26;
+        public string ImageUrl { get; set; } = string.Empty;
+    
 
         #region User
         public string CreatedByUserName { get; set; } = string.Empty;
