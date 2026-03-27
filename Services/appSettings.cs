@@ -13,6 +13,7 @@ namespace ReportPackaging.Services
         //Haora para poder conectar el mistral 
         public string MistralApiKey { get; set; }
         public ApiSettingsConfig ApiSettings { get; set; } = new ApiSettingsConfig();
+        public string SyncfusionLicense { get; set; } = string.Empty;
         public static AppSettings Current { get; internal set; } = new AppSettings();
     }
 
@@ -200,6 +201,7 @@ namespace ReportPackaging.Services
         {
             public string BaseUrl { get; set; } = string.Empty;
             public string TestUrl { get; set; } = string.Empty;
+            public string ProdUrl { get; set; } = string.Empty; 
         }
     }
 }

@@ -2,6 +2,7 @@
 using ReportPackaging.Data.Sew.IService;
 using ReportPackaging.Data.Sew.Service;
 using ReportPackaging.Services;
+using Syncfusion.Blazor;
 
 namespace ReportPackaging
 {
@@ -18,8 +19,8 @@ namespace ReportPackaging
                 });
 
             builder.Services.AddMauiBlazorWebView();
-
             AppSettingsLoader.Load();
+            Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(AppSettings.Current.SyncfusionLicense);
 
             // Registrar el handler primero
             builder.Services.AddTransient<ClerkAuthHandler>();
@@ -27,7 +28,7 @@ namespace ReportPackaging
             // ApiClient con el handler
             builder.Services.AddHttpClient("ApiClient", client =>
             {
-                client.BaseAddress = new Uri(AppSettings.Current.ApiSettings.TestUrl);
+                client.BaseAddress = new Uri(AppSettings.Current.ApiSettings.ProdUrl);
             })
             .AddHttpMessageHandler<ClerkAuthHandler>();
 
@@ -35,6 +36,9 @@ namespace ReportPackaging
             builder.Services.AddBlazorWebViewDeveloperTools();
             builder.Logging.AddDebug();
 #endif
+
+            builder.Services.AddSyncfusionBlazor();
+
             builder.Services.AddScoped<ITempPackingService, TempPackingScanService>();
             builder.Services.AddScoped<ISew_FabricInboundScanService, Sew_FabricInboundScanService>();
             builder.Services.AddScoped<IFactoryService, FactoryService>();

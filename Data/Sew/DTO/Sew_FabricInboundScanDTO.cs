@@ -17,7 +17,7 @@
         public int SupplierId { get; set; }
         public int BuyerId { get; set; }
         public string Rack { get; set; } = string.Empty;
-        public int CenterId { get; set; } = 26;
+        public int CenterId { get; set; }
         public string ImageUrl { get; set; } = string.Empty;
     
 

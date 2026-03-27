@@ -5,6 +5,11 @@
 @using ReportPackaging.Data.Sew.IService
 @using ReportPackaging.Data.Sew.Service
 @using System.Text.Json
+@using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Calendars
+@using Syncfusion.Blazor.Popups
 
 @inject IBlobStorageService BlobStorageService
 @inject ISew_FabricInboundScanService FabricInboundScanService
@@ -15,7 +20,6 @@
 
     <h3>📦 Envío de Mercaderías</h3>
 
-    <!-- SELECTOR DE TEMPLATE -->
     @if (templateSeleccionado == 0)
     {
         <div style="margin-bottom:16px;">
@@ -23,70 +27,68 @@
                 Selecciona el tipo de documento a escanear:
             </p>
             <div style="display:flex; flex-direction:column; gap:10px;">
-
                 <button @onclick="() => SeleccionarTemplate(1)"
-                        style="background:white; border:2px solid #0078d4; border-radius:10px;
-                                       padding:14px 16px; text-align:left; cursor:pointer;">
+                        style="background:white; border:2px solid #0078d4; border-radius:10px; padding:14px 16px; text-align:left; cursor:pointer;">
                     <div style="font-weight:700; color:#0078d4; font-size:14px;">📄 Textiles Solafe</div>
                     <div style="font-size:12px; color:#777; margin-top:3px;">ENVIO DE MERCADERÍAS</div>
                 </button>
-
                 <button @onclick="() => SeleccionarTemplate(2)"
-                        style="background:white; border:2px solid #107c41; border-radius:10px;
-                                       padding:14px 16px; text-align:left; cursor:pointer;">
+                        style="background:white; border:2px solid #107c41; border-radius:10px; padding:14px 16px; text-align:left; cursor:pointer;">
                     <div style="font-weight:700; color:#107c41; font-size:14px;">📄 C.R. Textil</div>
                     <div style="font-size:12px; color:#777; margin-top:3px;">ENVIO DE MERCADERÍAS — C.R. Textil, S.A.</div>
                 </button>
-
                 <button @onclick="() => SeleccionarTemplate(3)"
-                        style="background:white; border:2px solid #e53935; border-radius:10px;
-                                       padding:14px 16px; text-align:left; cursor:pointer;">
+                        style="background:white; border:2px solid #e53935; border-radius:10px; padding:14px 16px; text-align:left; cursor:pointer;">
                     <div style="font-weight:700; color:#e53935; font-size:14px;">📄 Apparel Links</div>
                     <div style="font-size:12px; color:#777; margin-top:3px;">REPORTE DE PACKING LIST BODEGA DE TELA</div>
                 </button>
-
             </div>
         </div>
     }
     else
     {
-        <!-- Header con template seleccionado -->
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;
-                            padding:10px 14px; background:#f0f7ff; border-radius:8px; border:1px solid #0078d4;">
-            <span style="font-size:13px; color:#0078d4; font-weight:600;">
-                📄 @NombreTemplate
-            </span>
-            <button @onclick="CambiarTemplate"
-                    style="margin-left:auto; background:none; border:1px solid #0078d4;
-                                   color:#0078d4; border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer;">
-                Cambiar
-            </button>
+                    padding:10px 14px; background:#f0f7ff; border-radius:8px; border:1px solid #0078d4;">
+            <span style="font-size:13px; color:#0078d4; font-weight:600;">📄 @NombreTemplate</span>
+            <SfButton CssClass="e-outline e-small" style="margin-left:auto;" OnClick="CambiarTemplate">Cambiar</SfButton>
         </div>
 
-        <!-- Botones de captura -->
+        <!-- FIX #2: botones nativos para que el ícono aparezca correctamente -->
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
             <button @onclick="OnTakePhotoClicked" disabled="@isLoading"
-                    style="background:#0078d4; color:white; padding:12px 20px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
-                📷 Tomar Foto
+                    style="background:#0078d4; color:white; padding:10px 18px; border:none; border-radius:6px;
+                           font-size:14px; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                <span class="e-icons e-camera" style="font-size:16px;"></span> Tomar Foto
             </button>
             <button @onclick="OnPickPhotoClicked" disabled="@isLoading"
-                    style="background:#107c41; color:white; padding:12px 20px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
-                🖼️ Subir Imagen
+                    style="background:#107c41; color:white; padding:10px 18px; border:none; border-radius:6px;
+                           font-size:14px; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                <span class="e-icons e-image" style="font-size:16px;"></span> Subir Imagen
             </button>
         </div>
 
-        <!-- Preview de imagen capturada -->
+        <!-- FIX #1: Vista previa con botón toggle -->
         @if (!string.IsNullOrEmpty(capturedImageBase64))
         {
-            <div style="margin-bottom:16px; text-align:center;">
-                <img src="data:@(capturedImageContentType);base64,@capturedImageBase64"
-                     alt="Documento capturado"
-                     style="max-width:100%; max-height:200px; border-radius:8px; border:2px solid #0078d4;" />
-                <div style="font-size:11px; color:#888; margin-top:4px;">Vista previa del documento</div>
+            <div style="margin-bottom:16px;">
+                <button @onclick="() => mostrarPreview = !mostrarPreview"
+                        style="background:#f0f7ff; border:1px solid #0078d4; border-radius:6px;
+                               padding:7px 14px; font-size:13px; color:#0078d4; cursor:pointer;
+                               display:flex; align-items:center; gap:6px;">
+                    <span class="e-icons @(mostrarPreview ? "e-chevron-up" : "e-chevron-down")" style="font-size:13px;"></span>
+                    @(mostrarPreview ? "Ocultar vista previa" : "📷 Vista previa del documento")
+                </button>
+                @if (mostrarPreview)
+                {
+                    <div style="margin-top:10px; text-align:center;">
+                        <img src="data:@(capturedImageContentType);base64,@capturedImageBase64"
+                             alt="Documento capturado"
+                             style="max-width:100%; max-height:300px; border-radius:8px; border:2px solid #0078d4;" />
+                    </div>
+                }
             </div>
         }
 
-        <!-- Loading -->
         @if (isLoading)
         {
             <div style="padding:16px; background:#fff8e1; border-radius:8px; color:#7a5c00; margin-bottom:16px;">
@@ -94,7 +96,6 @@
             </div>
         }
 
-        <!-- Error -->
         @if (!string.IsNullOrEmpty(errorMessage))
         {
             <div style="padding:12px; background:#fde8e8; border:1px solid #f44336; border-radius:8px; color:#c00; margin-bottom:16px;">
@@ -104,130 +105,89 @@
 
         @if (shippingData != null)
         {
-            <!-- Grupo 1: General Information -->
-            <div style="background:#f5f5f5; border-radius:8px; padding:16px; margin-bottom:16px;">
-                <h4 style="margin-top:0; color:#0078d4; border-bottom:2px solid #0078d4; padding-bottom:6px;">
-                    📋 General Information
-                </h4>
-                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:10px;">
-
-                    <div>
-                        <label style="@labelStyle">No. Envío</label>
-                        <input style="@inputStyle" @bind="noEnvio" placeholder="No. Envío..." />
-                    </div>
-
-                    <div>
-                        <label style="@labelStyle">Entry Date (Día / Mes / Año)</label>
-                        <div style="display:flex; gap:4px;">
-                            <input style="@inputStyle; width:45px;" @bind="shippingData.Dia" placeholder="DD" />
-                            <input style="@inputStyle; width:45px;" @bind="shippingData.Mes" placeholder="MM" />
-                            <input style="@inputStyle; width:60px;" @bind="shippingData.Ano" placeholder="AAAA" />
+            <div class="card card-bordered border-light mt-2 mb-2 p-0">
+                <div class="card-header p-3" style="background-color:#f0f7ff;">
+                    <h6 style="margin:0; color:#0078d4;">📋 General Information</h6>
+                </div>
+                <div class="card-body p-3">
+                    <div class="flex-container">
+                        <SfTextBox Placeholder="No. Envío" FloatLabelType="FloatLabelType.Always" CssClass="e-outline" @bind-Value="noEnvio" />
+                        <div>
+                            <label style="font-size:11px; color:#666; display:block; margin-bottom:4px;">Entry Date (Día / Mes / Año)</label>
+                            <div style="display:flex; gap:4px;">
+                                <SfTextBox Placeholder="DD" CssClass="e-outline" @bind-Value="shippingData.Dia" Width="55px" />
+                                <SfTextBox Placeholder="MM" CssClass="e-outline" @bind-Value="shippingData.Mes" Width="55px" />
+                                <SfTextBox Placeholder="AAAA" CssClass="e-outline" @bind-Value="shippingData.Ano" Width="75px" />
+                            </div>
                         </div>
+                        <SfDropDownList DataSource="@buyers" TItem="BuyerDTO" TValue="int"
+                                        Placeholder="Buyer" AllowFiltering="true"
+                                        FloatLabelType="FloatLabelType.Always" CssClass="e-outline"
+                                        @bind-Value="selectedBuyerId">
+                            <DropDownListFieldSettings Text="SmallName" Value="Id"></DropDownListFieldSettings>
+                        </SfDropDownList>
+                        <SfTextBox Placeholder="S/#" FloatLabelType="FloatLabelType.Always" CssClass="e-outline" @bind-Value="shippingData.Serie" />
+                        <SfDropDownList DataSource="@suppliers" TItem="SupplierDTO" TValue="int"
+                                        Placeholder="Textile Company" AllowFiltering="true"
+                                        FloatLabelType="FloatLabelType.Always" CssClass="e-outline"
+                                        @bind-Value="selectedSupplierId">
+                            <DropDownListFieldSettings Text="SupplierName" Value="Id"></DropDownListFieldSettings>
+                        </SfDropDownList>
                     </div>
-
-                    <div>
-                        <label style="@labelStyle">Buyer</label>
-                        <select style="@inputStyle" @bind="selectedBuyerId">
-                            <option value="0">-- Seleccionar --</option>
-                            @foreach (var b in buyers)
-                            {
-                                <option value="@b.Id">@b.SmallName</option>
-                            }
-                        </select>
-                    </div>
-
-                    <div>
-                        <label style="@labelStyle">S/#</label>
-                        <input style="@inputStyle" @bind="shippingData.Serie" />
-                    </div>
-
-                    <div>
-                        <label style="@labelStyle">Textile Company</label>
-                        <select style="@inputStyle" @bind="selectedSupplierId">
-                            <option value="0">-- Seleccionar --</option>
-                            @foreach (var s in suppliers)
-                            {
-                                <option value="@s.Id">@s.SupplierName</option>
-                            }
-                        </select>
-                    </div>
-
                 </div>
             </div>
 
-            <!-- Grupo 2: Fabric Information -->
-            <div style="background:#e8f4fd; border-radius:8px; padding:16px; margin-bottom:16px;">
-                <h4 style="margin-top:0; color:#0078d4; border-bottom:2px solid #0078d4; padding-bottom:6px;">
-                    🧵 Fabric Information
-                </h4>
-                <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:10px;">
-
-                    <div>
-                        <label style="@labelStyle">Tipo de Tela</label>
-                        <input style="@inputStyle" @bind="shippingData.TipoDeTela" />
-                    </div>
-                    <div>
-                        <label style="@labelStyle">Color</label>
-                        <input style="@inputStyle" @bind="shippingData.Color" />
-                    </div>
-                    <div>
-                        <label style="@labelStyle">Lot</label>
-                        <input style="@inputStyle" @bind="shippingData.Lot" />
-                    </div>
-                    <div>
-                        <label style="@labelStyle">Width</label>
-                        <input style="@inputStyle" @bind="shippingData.Ancho" />
-                    </div>
-                    <div>
-                        <label style="@labelStyle">Rolls</label>
-                        <input style="@inputStyle" @bind="shippingData.TotalRolls" />
-                    </div>
-                    <div>
-                        <label style="@labelStyle">Peso (Kgs)</label>
-                        <input style="@inputStyle" @bind="shippingData.TotalPesoCrudo" />
+            <div class="card card-bordered border-light mt-2 mb-2 p-0">
+                <div class="card-header p-3" style="background-color:#e8f4fd;">
+                    <h6 style="margin:0; color:#0078d4;">🧵 Fabric Information</h6>
+                </div>
+                <div class="card-body p-3">
+                    <div class="flex-container">
+                        <SfTextBox Placeholder="Tipo de Tela" FloatLabelType="FloatLabelType.Always" CssClass="e-outline" @bind-Value="shippingData.TipoDeTela" />
+                        <SfTextBox Placeholder="Color" FloatLabelType="FloatLabelType.Always" CssClass="e-outline" @bind-Value="shippingData.Color" />
+                        <SfTextBox Placeholder="Lot" FloatLabelType="FloatLabelType.Always" CssClass="e-outline" @bind-Value="shippingData.Lot" />
+                        <SfTextBox Placeholder="Width" FloatLabelType="FloatLabelType.Always" CssClass="e-outline" @bind-Value="shippingData.Ancho" />
+                        <SfNumericTextBox Placeholder="Rolls" FloatLabelType="FloatLabelType.Always" CssClass="e-outline" ShowSpinButton="false" @bind-Value="shippingData.TotalRolls" />
+                        <SfNumericTextBox Placeholder="Peso (Kgs)" FloatLabelType="FloatLabelType.Always" CssClass="e-outline" ShowSpinButton="false" @bind-Value="shippingData.TotalPesoCrudo" />
+                        <SfTextBox Placeholder="Rack" FloatLabelType="FloatLabelType.Always" CssClass="e-outline" @bind-Value="shippingData.Rack" />
                     </div>
 
                     <!-- Body / Rib toggle -->
-                    <div style="grid-column: span 2;">
-                        <label style="@labelStyle">Yards — selecciona tipo</label>
-                        <div style="display:flex; gap:0; margin-bottom:6px;">
+                    <div style="margin-top:16px;">
+                        <label style="font-size:11px; color:#666; display:block; margin-bottom:6px;">Yards — selecciona tipo</label>
+                        <div style="display:flex; gap:0; margin-bottom:8px;">
                             <button @onclick="() => SeleccionarTipoYards(true)"
                                     style="flex:1; padding:8px; border:2px solid @(isBody ? "#0078d4" : "#ccc");
-                                                           background:@(isBody ? "#0078d4" : "white");
-                                                           color:@(isBody ? "white" : "#333");
-                                                           border-radius:6px 0 0 6px; cursor:pointer; font-weight:600; font-size:13px;">
+                                           background:@(isBody ? "#0078d4" : "white"); color:@(isBody ? "white" : "#333");
+                                           border-radius:6px 0 0 6px; cursor:pointer; font-weight:600; font-size:13px;">
                                 🧴 Body
                             </button>
                             <button @onclick="() => SeleccionarTipoYards(false)"
                                     style="flex:1; padding:8px; border:2px solid @(!isBody ? "#0078d4" : "#ccc");
-                                                           background:@(!isBody ? "#0078d4" : "white");
-                                                           color:@(!isBody ? "white" : "#333");
-                                                           border-radius:0 6px 6px 0; cursor:pointer; font-weight:600; font-size:13px;">
+                                           background:@(!isBody ? "#0078d4" : "white"); color:@(!isBody ? "white" : "#333");
+                                           border-radius:0 6px 6px 0; cursor:pointer; font-weight:600; font-size:13px;">
                                 🧶 Rib
                             </button>
                         </div>
+                        <!-- FIX #3: Enabled="true" para permitir edición -->
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <input style="@inputStyle; margin:0;" @bind="shippingData.TotalYards" readonly />
-                            <span style="font-size:11px; color:#888; white-space:nowrap;">
-                                → @(isBody ? "Body Received" : "Rib Received")
-                            </span>
+                            <SfNumericTextBox @bind-Value="shippingData.TotalYards"
+                                              Enabled="true"
+                                              CssClass="e-outline"
+                                              ShowSpinButton="false"
+                                              Placeholder="Total Yards"
+                                              FloatLabelType="FloatLabelType.Always"
+                                              Width="160px" />
+                            <span style="font-size:11px; color:#888;">→ @(isBody ? "Body Received" : "Rib Received")</span>
                         </div>
                     </div>
-
-                    <div>
-                        <label style="@labelStyle">Rack</label>
-                        <input style="@inputStyle" @bind="shippingData.Rack" />
-                    </div>
-
                 </div>
             </div>
 
-            <!-- Botones -->
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <button @onclick="GuardarDatos" disabled="@isGuardando"
-                        style="background:#28a745; color:white; padding:10px 24px; border:none; border-radius:8px; font-size:15px; cursor:pointer;">
-                    💾 @(isGuardando ? "Guardando..." : "Guardar en DB")
-                </button>
+            <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+                <SfButton CssClass="e-success e-large" IconCss="e-icons e-save" OnClick="GuardarDatos" Disabled="@isGuardando">
+                    @(isGuardando ? "Guardando..." : "Guardar en DB")
+                </SfButton>
             </div>
 
             @if (!string.IsNullOrEmpty(mensajeGuardado))
@@ -241,35 +201,37 @@
 
 </div>
 
+<style>
+    .flex-container { display:flex; flex-wrap:wrap; gap:14px; }
+    .flex-container > * { flex:1; min-width:160px; }
+</style>
+
 @code {
 
-    private int templateSeleccionado = 0;
-    private bool isLoading = false;
-    private bool isGuardando = false;
-    private bool isBody = true;
-    private string errorMessage = string.Empty;
-    private string mensajeGuardado = string.Empty;
-    private string noEnvio = string.Empty;
-    private ShippingData? shippingData = null;
+    private int    templateSeleccionado = 0;
+    private bool   isLoading            = false;
+    private bool   isGuardando          = false;
+    private bool   isBody               = true;
+    private bool   mostrarPreview       = false;
+    private string errorMessage         = string.Empty;
+    private string mensajeGuardado      = string.Empty;
+    private string noEnvio              = string.Empty;
+    private ShippingData? shippingData  = null;
 
-    // ═══ Variables para imagen/blob ═══
-    private string? imageUrl = null;
+    private string? imageUrl                  = null;
     private MemoryStream? capturedImageStream = null;
-    private string? capturedImageContentType = null;
-    private string? capturedImageFileName = null;
-    private string? capturedImageBase64 = null;  // para preview en UI
+    private string? capturedImageContentType  = null;
+    private string? capturedImageFileName     = null;
+    private string? capturedImageBase64       = null;
 
-    private int selectedBuyerId = 0;
+    private int selectedBuyerId    = 0;
     private int selectedSupplierId = 0;
+    private string _email          = string.Empty;
+    private bool   _isLoggedIn;
 
-    private string _email = string.Empty;
-    private bool _isLoggedIn;
-
-    private List<BuyerDTO> buyers = new();
+    private List<BuyerDTO>    buyers    = new();
     private List<SupplierDTO> suppliers = new();
-
-    private string inputStyle = "width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box;";
-    private string labelStyle = "font-size:11px; color:#666; display:block; margin-bottom:3px;";
+    private Sew_GetDataFromUserDTO? currentUser = null;
 
     private string NombreTemplate => templateSeleccionado switch
     {
@@ -279,34 +241,46 @@
         _ => string.Empty
     };
 
+    protected override async Task OnInitializedAsync() => await CargarListas();
+
+    // private async Task CargarListas()
+    // {
+    //     // currentUser = (await SewGetDataFromUserService.GetAllAsync(_email)).FirstOrDefault();
+    //     // Console.WriteLine($"Id:{currentUser.ID} | UserName:{currentUser.UserName} | Email:{currentUser.Email} | NameEn:{currentUser.NameEn} | CenterId:{currentUser.CenterId}");
+    //     buyers    = (await FactoryService.GetBuyersByCenter(14)).ToList();
+    //     suppliers = (await FactoryService.GetSuppliersByCenter(14)).ToList();
+    // }
+
     private async Task CargarListas()
     {
-        buyers = (await FactoryService.GetBuyersByCenter(14)).ToList();
-        suppliers = (await FactoryService.GetSuppliersByCenter(14)).ToList();
+        currentUser = (await SewGetDataFromUserService.GetAllAsync(_email)).FirstOrDefault();
+        Console.WriteLine($"Id:{currentUser.ID} | UserName:{currentUser.UserName} | Email:{currentUser.Email} | NameEn:{currentUser.NameEn} | CenterId:{currentUser.CenterId}");
+
+        buyers = (await FactoryService.GetBuyersByCenter(currentUser.CenterId)).ToList();
+        suppliers = (await FactoryService.GetSuppliersByCenter(currentUser.CenterId)).ToList();
     }
+
 
     private void SeleccionarTemplate(int template)
     {
         templateSeleccionado = template;
-        shippingData = null;
-        errorMessage = string.Empty;
+        shippingData    = null;
+        errorMessage    = string.Empty;
         mensajeGuardado = string.Empty;
+        mostrarPreview  = false;
         StateHasChanged();
     }
 
     private void CambiarTemplate()
     {
         templateSeleccionado = 0;
-        shippingData = null;
-        errorMessage = string.Empty;
+        shippingData   = null;
+        errorMessage   = string.Empty;
+        mostrarPreview = false;
         StateHasChanged();
     }
 
-    private void SeleccionarTipoYards(bool body)
-    {
-        isBody = body;
-        StateHasChanged();
-    }
+    private void SeleccionarTipoYards(bool body) { isBody = body; StateHasChanged(); }
 
     private void AutoSeleccionarListas()
     {
@@ -318,7 +292,6 @@
                 shippingData.Buyer.Contains(b.BuyerName, StringComparison.OrdinalIgnoreCase));
             selectedBuyerId = match?.Id ?? 0;
         }
-
         if (!string.IsNullOrWhiteSpace(shippingData?.TextileCompany))
         {
             var match = suppliers.FirstOrDefault(s =>
@@ -330,11 +303,7 @@
 
     private async Task OnTakePhotoClicked()
     {
-        if (!MediaPicker.Default.IsCaptureSupported)
-        {
-            errorMessage = "Este dispositivo no soporta cámara.";
-            return;
-        }
+        if (!MediaPicker.Default.IsCaptureSupported) { errorMessage = "Este dispositivo no soporta cámara."; return; }
         var photo = await MediaPicker.Default.CapturePhotoAsync();
         if (photo == null) return;
         await ProcesarFoto(photo);
@@ -351,45 +320,32 @@
     {
         try
         {
-            errorMessage = string.Empty;
-            mensajeGuardado = string.Empty;
-            shippingData = null;
-            isBody = true;
-            selectedBuyerId = 0;
-            selectedSupplierId = 0;
-            imageUrl = null;
-            capturedImageBase64 = null;
-            isLoading = true;
-            StateHasChanged();
+            errorMessage = string.Empty; mensajeGuardado = string.Empty;
+            shippingData = null; isBody = true; selectedBuyerId = 0; selectedSupplierId = 0;
+            imageUrl = null; capturedImageBase64 = null; mostrarPreview = false;
+            isLoading = true; StateHasChanged();
 
             AppSettingsLoader.Load();
             var endpoint = AppSettings.Current.AzureComputerVision.Endpoint;
-            var apiKey = AppSettings.Current.AzureComputerVision.Key;
+            var apiKey   = AppSettings.Current.AzureComputerVision.Key;
 
             if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(apiKey))
-            {
-                errorMessage = "No se encontró el Endpoint o Key de Azure en appsettings.json.";
-                return;
-            }
+            { errorMessage = "No se encontró el Endpoint o Key de Azure en appsettings.json."; return; }
 
             using var stream = await photo.OpenReadAsync();
             using var memoryStream = new MemoryStream();
             await stream.CopyToAsync(memoryStream);
             memoryStream.Position = 0;
 
-            // ═══ Guardar copia para subir al blob después ═══
-            capturedImageStream?.Dispose();  // limpiar anterior si existe
+            capturedImageStream?.Dispose();
             capturedImageStream = new MemoryStream();
             await memoryStream.CopyToAsync(capturedImageStream);
             capturedImageStream.Position = 0;
-            memoryStream.Position = 0;  // resetear para OCR
+            memoryStream.Position = 0;
 
             capturedImageContentType = photo.ContentType ?? "image/jpeg";
-            capturedImageFileName = photo.FileName;
-
-            // Generar base64 para preview en la UI
-            capturedImageBase64 = Convert.ToBase64String(capturedImageStream.ToArray());
-            // ═══ Fin copia blob ═══
+            capturedImageFileName    = photo.FileName;
+            capturedImageBase64      = Convert.ToBase64String(capturedImageStream.ToArray());
 
             shippingData = templateSeleccionado switch
             {
@@ -398,7 +354,6 @@
                 3 => await new AzureShippingServiceAL(endpoint, apiKey).AnalyzeShippingAsync(memoryStream),
                 _ => throw new Exception("Template no seleccionado.")
             };
-
             AutoSeleccionarListas();
         }
         catch (Exception ex)
@@ -406,94 +361,67 @@
             errorMessage = $"Error: {ex.Message}";
             System.Diagnostics.Debug.WriteLine($"[ShippingCapture] {ex}");
         }
-        finally
-        {
-            isLoading = false;
-            StateHasChanged();
-        }
+        finally { isLoading = false; StateHasChanged(); }
     }
 
     private async Task GuardarDatos()
     {
         try
         {
-            isGuardando = true;
-            mensajeGuardado = string.Empty;
-            StateHasChanged();
+            isGuardando = true; mensajeGuardado = string.Empty; StateHasChanged();
 
-            // ═══ Subir imagen al blob storage ═══
             if (capturedImageStream != null && capturedImageStream.Length > 0)
             {
                 capturedImageStream.Position = 0;
-                var cleanName = (capturedImageFileName ?? $"scan_{DateTime.Now:yyyyMMddHHmmss}.jpg")
-                                .Replace(" ", "");
-                // Nombre único para evitar colisiones
+                var cleanName  = (capturedImageFileName ?? $"scan_{DateTime.Now:yyyyMMddHHmmss}.jpg").Replace(" ", "");
                 var uniqueName = $"{DateTime.Now:yyyyMMddHHmmss}_{cleanName}";
-                var blobPath = $"Sew/FabricInboundScans/{uniqueName}";
-
                 imageUrl = await BlobStorageService.UploadFileToBlobAsync(
-                    blobPath,
+                    $"Sew/FabricInboundScans/{uniqueName}",
                     capturedImageContentType ?? "image/jpeg",
-                    capturedImageStream
-                );
-
+                    capturedImageStream);
                 System.Diagnostics.Debug.WriteLine($"[ShippingCapture] Imagen subida: {imageUrl}");
             }
-            // ═══ Fin subida blob ═══
 
             DateTime entryDate = DateTime.Now;
             if (int.TryParse(shippingData.Dia, out int dia) &&
                 int.TryParse(shippingData.Mes, out int mes) &&
                 int.TryParse(shippingData.Ano, out int ano))
-            {
                 entryDate = new DateTime(ano, mes, dia);
-            }
 
             decimal bodyReceived = isBody ? shippingData.TotalYards : 0;
-            decimal ribReceived = isBody ? 0 : shippingData.TotalYards;
-
-            var supplierName = suppliers.FirstOrDefault(s => s.Id == selectedSupplierId)?.SupplierName ?? string.Empty;
+            decimal ribReceived  = isBody ? 0 : shippingData.TotalYards;
+            var supplierName     = suppliers.FirstOrDefault(s => s.Id == selectedSupplierId)?.SupplierName ?? string.Empty;
 
             var dto = new Sew_FabricInboundScanDTO
             {
-                EnvID = noEnvio,
-                EntryDate = entryDate,
-                FileNo = shippingData.Serie ?? string.Empty,
-                Color = shippingData.Color ?? string.Empty,
-                Lot = shippingData.Lot ?? string.Empty,
-                Width = shippingData.Ancho ?? string.Empty,
-                Rolls = shippingData.TotalRolls,
-                KgsReceived = shippingData.TotalPesoCrudo,
-                BodyReceived = bodyReceived,
-                RibReceived = ribReceived,
-                FabricType = shippingData.TipoDeTela ?? string.Empty,
-                SupplierName = supplierName,
-                SupplierId = selectedSupplierId,
-                BuyerId = selectedBuyerId,
-                Rack = shippingData.Rack ?? string.Empty,
-                ImageUrl = imageUrl ?? string.Empty,  // ← NUEVO
-                CreatedDate = DateTime.Now,
-                LastUpdatedDate = DateTime.Now,
-                CreatedByUserName = "TestUser26",
-                LastUpdatedByUserId = "TestUser26",
-                LastUpdatedByUserNameEn = "TestUser26",
-                CenterId = 26
+                EnvID                   = noEnvio,
+                EntryDate               = entryDate,
+                FileNo                  = shippingData.Serie      ?? string.Empty,
+                Color                   = shippingData.Color      ?? string.Empty,
+                Lot                     = shippingData.Lot        ?? string.Empty,
+                Width                   = shippingData.Ancho      ?? string.Empty,
+                Rolls                   = shippingData.TotalRolls,
+                KgsReceived             = shippingData.TotalPesoCrudo,
+                BodyReceived            = bodyReceived,
+                RibReceived             = ribReceived,
+                FabricType              = shippingData.TipoDeTela ?? string.Empty,
+                SupplierName            = supplierName,
+                SupplierId              = selectedSupplierId,
+                BuyerId                 = selectedBuyerId,
+                Rack                    = shippingData.Rack       ?? string.Empty,
+                ImageUrl                = imageUrl                ?? string.Empty,
+                CreatedDate             = DateTime.Now,
+                LastUpdatedDate         = DateTime.Now,
+                CreatedByUserName       = currentUser.UserName,
+                LastUpdatedByUserId     = currentUser.ID,
+                LastUpdatedByUserNameEn = currentUser.NameEn,
+                CenterId                = currentUser.CenterId
             };
 
             var ok = await FabricInboundScanService.CreateFabricInboundScan(dto);
-
-            mensajeGuardado = ok
-                ? "Documento guardado correctamente."
-                : "⚠️ Error al guardar. Revisa tu conexión.";
+            mensajeGuardado = ok ? "Documento guardado correctamente." : "⚠️ Error al guardar. Revisa tu conexión.";
         }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error al guardar: {ex.Message}";
-        }
-        finally
-        {
-            isGuardando = false;
-            StateHasChanged();
-        }
+        catch (Exception ex) { errorMessage = $"Error al guardar: {ex.Message}"; }
+        finally { isGuardando = false; StateHasChanged(); }
     }
 }
