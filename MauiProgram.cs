@@ -28,7 +28,7 @@ namespace ReportPackaging
             // ApiClient con el handler
             builder.Services.AddHttpClient("ApiClient", client =>
             {
-                client.BaseAddress = new Uri(AppSettings.Current.ApiSettings.ProdUrl);
+                client.BaseAddress = new Uri(AppSettings.Current.ApiSettings.TestUrl);
             })
             .AddHttpMessageHandler<ClerkAuthHandler>();
 
@@ -41,9 +41,11 @@ namespace ReportPackaging
 
             builder.Services.AddScoped<ITempPackingService, TempPackingScanService>();
             builder.Services.AddScoped<ISew_FabricInboundScanService, Sew_FabricInboundScanService>();
+            builder.Services.AddScoped<ISew_CuttingStatusService, Sew_CuttingStatusService>();
             builder.Services.AddScoped<IFactoryService, FactoryService>();
             builder.Services.AddScoped<ISewGetDataFromUserService, SewGetDataFromUserService>();
             builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
+            builder.Services.AddScoped<AzureAuthService>();
 
             return builder.Build();
         }

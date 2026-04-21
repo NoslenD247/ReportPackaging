@@ -155,7 +155,7 @@ namespace ReportPackaging.Services
 
                 // Detect size headers row: "Color Orden XS S M L XL 2XL TOTAL"
                 // The row that contains "color" and "orden" and "total" marks the header
-                if (low == "color" || low == "orden")
+                if (low.StartsWith("color") || low.StartsWith("orden"))
                 {
                     // Find the full header row — collect consecutive non-data lines
                     // Headers: Color, Orden, [sizes...], TOTAL

@@ -1,19 +1,38 @@
 ﻿@page "/home"
 @using ReportPackaging.Services
 
-<h1>Hello, world!</h1>
-<p>Email: @_email</p>
-<p>Logged in: @_isLoggedIn</p>
+<h2>Datos de Sesión</h2>
+<table style="border-collapse:collapse; font-family:monospace; font-size:0.9rem;">
+    <tr><th style="text-align:left; padding:4px 12px 4px 0; color:#6B7280;">Campo</th><th style="text-align:left; padding:4px 0; color:#6B7280;">Valor</th></tr>
+    <tr><td>Email</td><td>@_email</td></tr>
+    <tr><td>Logged In</td><td>@_isLoggedIn</td></tr>
+    <tr><td>Login Type</td><td>@_loginType</td></tr>
+    <tr><td>user_center_id</td><td style="color:@(_centerId == 0 ? "#EF4444" : "#16A34A"); font-weight:bold;">@_centerId</td></tr>
+    <tr><td>user_id</td><td>@_userId</td></tr>
+    <tr><td>user_name_en</td><td>@_nameEn</td></tr>
+    <tr><td>user_username</td><td>@_username</td></tr>
+    <tr><td>azure_role</td><td>@_role</td></tr>
+</table>
 
 @code {
-    private string _email = string.Empty;
-    private string _token = string.Empty;
-    private bool _isLoggedIn;
+    private string _email     = string.Empty;
+    private bool   _isLoggedIn;
+    private string _loginType = string.Empty;
+    private int    _centerId;
+    private string _userId    = string.Empty;
+    private string _nameEn    = string.Empty;
+    private string _username  = string.Empty;
+    private string _role      = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
-        _email = SessionService.GetUserEmail();
+        _email      = SessionService.GetUserEmail();
         _isLoggedIn = Preferences.Get("is_logged_in", false);
-        _token = await SecureStorage.GetAsync("clerk_JWT") ?? "VACÍO";
+        _loginType  = await SecureStorage.GetAsync("login_type") ?? "VACÍO";
+        _centerId   = Preferences.Get("user_center_id", 0);
+        _userId     = Preferences.Get("user_id",        string.Empty);
+        _nameEn     = Preferences.Get("user_name_en",   string.Empty);
+        _username   = Preferences.Get("user_username",  string.Empty);
+        _role       = Preferences.Get("azure_role",     string.Empty);
     }
 }

@@ -1,14 +1,26 @@
-﻿@page "/take-photo"
+@page "/take-photo"
 
 @using ReportPackaging.Services
 @using ReportPackaging.Data.Sew.IService
 @using ReportPackaging.Data.Sew.Service
 @using ReportPackaging.Data.Sew.DTO
 @using System.Text.Json
+@using Syncfusion.Blazor.Calendars
+@using Syncfusion.Blazor.Inputs
 
 @inject ITempPackingService TempPackingService
 
 <div style="font-family: sans-serif; max-width: 100%; padding: 16px;">
+
+    @if (_mostrarToast)
+    {
+        <div style="position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+                    background:#2e7d32; color:white; padding:14px 28px; border-radius:10px;
+                    font-size:15px; font-weight:600; box-shadow:0 4px 16px rgba(0,0,0,0.25);
+                    z-index:9999; white-space:nowrap;">
+            ✅ Guardado correctamente
+        </div>
+    }
 
     <h3>📷 Escanear Reporte de Empaque</h3>
 
@@ -48,7 +60,16 @@
             <span style="font-weight:700; color:#0078d4; font-size:15px;">🏭 @reportData.FabricaName</span>
             <div style="display:flex; align-items:center; gap:6px;">
                 <label style="font-size:13px; color:#555; font-weight:600;">📅 Fecha:</label>
-                <input style="@inputStyle; width:110px;" @bind="reportData.Fecha" />
+                <SfDatePicker TValue="DateTime"
+                              FloatLabelType="FloatLabelType.Never"
+                              CssClass="e-outline"
+                              @bind-Value="_fecha"
+                              Format="dd/MM/yyyy"
+                              Width="140px" />
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+                <label style="font-size:13px; color:#555; font-weight:600;">Int File:</label>
+                <input style="@inputStyle; width:110px;" @bind="_intFile" />
             </div>
         </div>
 
@@ -159,9 +180,12 @@
 
     private bool isLoading = false;
     private bool isGuardando = false;
+    private bool _mostrarToast = false;
     private string errorMessage = string.Empty;
     private string mensajeGuardado = string.Empty;
     private PackingReportData? reportData = null;
+    private DateTime _fecha = DateTime.Now;
+    private string _intFile = string.Empty;
 
     private string thStyle = "padding:8px 10px; text-align:left; white-space:nowrap; font-weight:600;";
     private string tdStyle = "padding:4px 6px;";
@@ -224,6 +248,14 @@
             var service = new AzurePackingReportService(endpoint, apiKey);
             reportData = await service.AnalyzeAsync(ms);
 
+            if (DateTime.TryParseExact(reportData.Fecha,
+                    new[] { "dd/MM/yyyy", "yyyy-MM-dd", "MM/dd/yyyy", "d/M/yyyy", "d/M/yy" },
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var parsedFecha))
+                _fecha = parsedFecha;
+            else
+                _fecha = DateTime.Now;
+
             if (reportData.Sections.Count == 0)
                 errorMessage = "No se detectaron secciones. Intenta con mejor iluminación.";
         }
@@ -250,27 +282,50 @@
 
             int guardados = 0;
             int fallidos = 0;
+            int centerId = Preferences.Get("user_center_id", 0);
 
             foreach (var section in reportData.Sections)
             {
+                // Tallas activas de esta sección (sin "total")
+                var sizes = section.SizeHeaders
+                    .Where(h => !h.Equals("total", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
                 foreach (var row in section.Rows)
                 {
+                    int Qty(int idx) => sizes.Count > idx
+                        ? (int)(row.Sizes.TryGetValue(sizes[idx], out var v) ? v : 0)
+                        : 0;
+                    string Name(int idx) => sizes.Count > idx ? sizes[idx] : string.Empty;
+
                     var dto = new TempPackingDTO
                     {
-                        Buyer = section.Client ?? string.Empty,
-                        Style = section.Style ?? string.Empty,
-                        Po = section.PO ?? string.Empty,
-                        Color = row.Color ?? string.Empty,
-                        Orden = row.Orden ?? string.Empty,
-                        ReportDate = reportData.Fecha,
+                        Buyer      = section.Client ?? string.Empty,
+                        Style      = section.Style  ?? string.Empty,
+                        Po         = section.PO     ?? string.Empty,
+                        Color      = row.Color      ?? string.Empty,
+                        Orden      = row.Orden      ?? string.Empty,
+                        ReportDate = _fecha.ToString("yyyy-MM-dd"),
                         TodayTotal = (int)row.Total,
-                        Xs = (int)(row.Sizes.TryGetValue("XS", out var xs) ? xs : 0),
-                        S = (int)(row.Sizes.TryGetValue("S", out var s) ? s : 0),
-                        M = (int)(row.Sizes.TryGetValue("M", out var m) ? m : 0),
-                        L = (int)(row.Sizes.TryGetValue("L", out var l) ? l : 0),
-                        Xl = (int)(row.Sizes.TryGetValue("XL", out var xl) ? xl : 0),
-                        Xl2 = (int)(row.Sizes.TryGetValue("2XL", out var xl2) ? xl2 : 0),
-                        Xl3 = (int)(row.Sizes.TryGetValue("3XL", out var xl3) ? xl3 : 0),
+                        CenterID   = centerId.ToString(),
+                        SizeGroupId = 0,
+                        IntFile    = _intFile,
+
+                        SizeName_1  = Name(0),  SizeName_2  = Name(1),  SizeName_3  = Name(2),
+                        SizeName_4  = Name(3),  SizeName_5  = Name(4),  SizeName_6  = Name(5),
+                        SizeName_7  = Name(6),  SizeName_8  = Name(7),  SizeName_9  = Name(8),
+                        SizeName_10 = Name(9),  SizeName_11 = Name(10), SizeName_12 = Name(11),
+                        SizeName_13 = Name(12), SizeName_14 = Name(13), SizeName_15 = Name(14),
+                        SizeName_16 = Name(15), SizeName_17 = Name(16), SizeName_18 = Name(17),
+                        SizeName_19 = Name(18), SizeName_20 = Name(19),
+
+                        SizeQTY_1  = Qty(0),  SizeQTY_2  = Qty(1),  SizeQTY_3  = Qty(2),
+                        SizeQTY_4  = Qty(3),  SizeQTY_5  = Qty(4),  SizeQTY_6  = Qty(5),
+                        SizeQTY_7  = Qty(6),  SizeQTY_8  = Qty(7),  SizeQTY_9  = Qty(8),
+                        SizeQTY_10 = Qty(9),  SizeQTY_11 = Qty(10), SizeQTY_12 = Qty(11),
+                        SizeQTY_13 = Qty(12), SizeQTY_14 = Qty(13), SizeQTY_15 = Qty(14),
+                        SizeQTY_16 = Qty(15), SizeQTY_17 = Qty(16), SizeQTY_18 = Qty(17),
+                        SizeQTY_19 = Qty(18), SizeQTY_20 = Qty(19),
                     };
 
                     var ok = await TempPackingService.InsertAsync(dto);
@@ -279,9 +334,15 @@
                 }
             }
 
-            mensajeGuardado = fallidos == 0
-                ? $"{guardados} fila(s) guardadas correctamente."
-                : $"⚠️ {guardados} guardadas, {fallidos} fallidas.";
+            if (fallidos == 0)
+            {
+                reportData = null;
+                _ = MostrarToast();
+            }
+            else
+            {
+                mensajeGuardado = $"⚠️ {guardados} guardadas, {fallidos} fallidas.";
+            }
         }
         catch (Exception ex)
         {
@@ -292,5 +353,14 @@
             isGuardando = false;
             StateHasChanged();
         }
+    }
+
+    private async Task MostrarToast()
+    {
+        _mostrarToast = true;
+        StateHasChanged();
+        await Task.Delay(3000);
+        _mostrarToast = false;
+        StateHasChanged();
     }
 }

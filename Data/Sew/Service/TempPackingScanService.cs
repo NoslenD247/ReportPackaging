@@ -23,11 +23,35 @@ namespace ReportPackaging.Data.Sew.Service
             try
             {
                 var response = await _httpclient.PostAsJsonAsync("TempPacking/Insert", item);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    Debug.WriteLine($"[TempPackingService] Error {(int)response.StatusCode}: {body}");
+                }
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[TempPackingService] Error: {ex.Message}");
+                Debug.WriteLine($"[TempPackingService] InsertAsync Error: {ex.Message}");
+                return false;
+            }
+        }
+
+        public async Task<bool> UpdateAsync(TempPackingDTO item)
+        {
+            try
+            {
+                var response = await _httpclient.PutAsJsonAsync("TempPacking/Update", item);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    Debug.WriteLine($"[TempPackingService] UpdateAsync Error {(int)response.StatusCode}: {body}");
+                }
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[TempPackingService] UpdateAsync Error: {ex.Message}");
                 return false;
             }
         }

@@ -2,9 +2,12 @@
 @using ReportPackaging.Config
 @using ReportPackaging.Helpers
 @using ReportPackaging.Services
+@using ReportPackaging.Data.Sew.IService
 @using System.Text.Json
 @using System.Text.Json.Serialization
 @inject NavigationManager Navigation
+@inject AzureAuthService AzureAuth
+@inject ISewGetDataFromUserService UserDataService
 
 @if (_checking)
 {
@@ -16,50 +19,66 @@ else
 {
     <div class="login-container">
         <div class="login-card">
-            <h1 class="login-title">Auth Demo</h1>
+            <h1 class="login-title">Iniciar Sesión</h1>
             <p class="login-subtitle">Ingreso corporativo seguro</p>
 
-            <button class="login-btn" @onclick="OnLoginClicked" disabled="@_isLoading">
-                @(_isLoading ? "Autenticando..." : "Iniciar Sesión (Clerk OTP)")
+            <!-- Clerk SSO -->
+            <button class="login-btn login-btn-clerk" @onclick="OnLoginClicked" disabled="@_isLoading">
+                @(_isLoading ? "Autenticando..." : "Iniciar Sesión con Clerk (SSO)")
             </button>
-
-            <p class="login-status">@_statusMessage</p>
 
             @if (!string.IsNullOrEmpty(_errorMessage))
             {
                 <p class="login-error">@_errorMessage</p>
             }
+            <p class="login-status">@_statusMessage</p>
+
+            <!-- Separador -->
+            <div class="login-divider">
+                <span>o</span>
+            </div>
+
+            <!-- Azure Login -->
+            <p class="login-section-label">Iniciar Sesión con cuenta corporativa</p>
+
+            <input class="login-input"
+                   type="text"
+                   placeholder="Usuario o correo"
+                   @bind="_azureIdentifier"
+                   disabled="@_isAzureLoading" />
+
+            <input class="login-input"
+                   type="password"
+                   placeholder="Contraseña"
+                   @bind="_azurePassword"
+                   disabled="@_isAzureLoading" />
+
+            <button class="login-btn login-btn-azure" @onclick="OnAzureLoginClicked" disabled="@_isAzureLoading">
+                @(_isAzureLoading ? "Autenticando..." : "Iniciar Sesión con Azure")
+            </button>
+
+            @if (!string.IsNullOrEmpty(_azureErrorMessage))
+            {
+                <p class="login-error">@_azureErrorMessage</p>
+            }
         </div>
     </div>
 }
 
-<div class="login-container">
-    <div class="login-card">
-
-        <h1 class="login-title">Auth Demo</h1>
-        <p class="login-subtitle">Ingreso corporativo seguro</p>
-
-        <button class="login-btn" @onclick="OnLoginClicked" disabled="@_isLoading">
-            @(_isLoading ? "Autenticando..." : "Iniciar Sesión (Clerk OTP)")
-        </button>
-
-        <p class="login-status">@_statusMessage</p>
-
-        @if (!string.IsNullOrEmpty(_errorMessage))
-        {
-            <p class="login-error">@_errorMessage</p>
-        }
-
-    </div>
-</div>
-
 @code {
     private readonly HttpClient _httpClient = new();
 
+    // Clerk
     private bool _isLoading = false;
-    private string _statusMessage = "Esperando autenticación...";
+    private string _statusMessage = string.Empty;
     private string _errorMessage = string.Empty;
     private bool _checking = true;
+
+    // Azure
+    private string _azureIdentifier = string.Empty;
+    private string _azurePassword = string.Empty;
+    private bool _isAzureLoading = false;
+    private string _azureErrorMessage = string.Empty;
 
     protected override void OnInitialized()
     {
@@ -114,9 +133,21 @@ else
 
                     if (!string.IsNullOrEmpty(email))
                     {
-                        // 6. Guardar sesión
-                        await SessionService.SaveSessionAsync(token.AccessToken, email);
+                        // 6. Guardar el JWT antes de llamar a la API (ClerkAuthHandler lo necesita)
                         await SecureStorage.SetAsync("clerk_JWT", token.IdToken);
+
+                        // 7. Obtener datos del usuario desde la BD usando el email
+                        var userData = (await UserDataService.GetAllAsync(email)).FirstOrDefault();
+                        if (userData != null)
+                        {
+                            Preferences.Set("user_center_id", userData.CenterId);
+                            Preferences.Set("user_id",        userData.ID        ?? string.Empty);
+                            Preferences.Set("user_name_en",   userData.NameEn    ?? string.Empty);
+                            Preferences.Set("user_username",  userData.UserName  ?? string.Empty);
+                        }
+
+                        // 8. Guardar sesión
+                        await SessionService.SaveSessionAsync(token.AccessToken, email);
 
                         var verificacion = await SecureStorage.GetAsync("clerk_JWT");
                         System.Diagnostics.Debug.WriteLine($"[Login] clerk_JWT guardado: {verificacion ?? "NULL"}");
@@ -167,6 +198,43 @@ else
 
         if (!response.IsSuccessStatusCode) return null;
         return JsonSerializer.Deserialize<TokenResponse>(json);
+    }
+
+    private async Task OnAzureLoginClicked()
+    {
+        if (string.IsNullOrWhiteSpace(_azureIdentifier) || string.IsNullOrWhiteSpace(_azurePassword))
+        {
+            _azureErrorMessage = "Ingresa tu usuario y contraseña.";
+            return;
+        }
+
+        _isAzureLoading = true;
+        _azureErrorMessage = string.Empty;
+
+        var (user, token, role, error) = await AzureAuth.LoginAsync(_azureIdentifier, _azurePassword);
+
+        if (user != null && !string.IsNullOrEmpty(token))
+        {
+            string email = !string.IsNullOrEmpty(user.Email) ? user.Email : user.UserName;
+
+            await SessionService.SaveSessionAsync(token, email);
+            await SecureStorage.SetAsync("azure_JWT", token);
+            await SecureStorage.SetAsync("login_type", "azure");
+
+            Preferences.Set("azure_role",    role         ?? string.Empty);
+            Preferences.Set("user_center_id", user.CenterId);
+            Preferences.Set("user_id",        user.Id      ?? string.Empty);
+            Preferences.Set("user_name_en",   user.NameEn  ?? string.Empty);
+            Preferences.Set("user_username",  user.UserName ?? string.Empty);
+
+            Navigation.NavigateTo("/home", forceLoad: true);
+        }
+        else
+        {
+            _azureErrorMessage = error ?? "Error al iniciar sesión.";
+        }
+
+        _isAzureLoading = false;
     }
 
     private async Task<string?> GetUserEmailFromClerk(string accessToken)
@@ -239,7 +307,6 @@ else
     .login-btn {
         width: 100%;
         height: 50px;
-        background-color: #4F46E5;
         color: white;
         border: none;
         border-radius: 8px;
@@ -248,8 +315,61 @@ else
         margin-top: 10px;
     }
 
+    .login-btn-clerk {
+        background-color: #4F46E5;
+    }
+
+    .login-btn-azure {
+        background-color: #0078D4;
+    }
+
         .login-btn:disabled {
             opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+    .login-divider {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        gap: 10px;
+        margin: 8px 0;
+        color: #9CA3AF;
+        font-size: 0.85rem;
+    }
+
+        .login-divider::before,
+        .login-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background-color: #E5E7EB;
+        }
+
+    .login-section-label {
+        font-size: 0.85rem;
+        color: #6B7280;
+        margin: 0;
+        align-self: flex-start;
+    }
+
+    .login-input {
+        width: 100%;
+        height: 44px;
+        border: 1px solid #D1D5DB;
+        border-radius: 8px;
+        padding: 0 12px;
+        font-size: 1rem;
+        box-sizing: border-box;
+        outline: none;
+    }
+
+        .login-input:focus {
+            border-color: #0078D4;
+        }
+
+        .login-input:disabled {
+            background-color: #F9FAFB;
             cursor: not-allowed;
         }
 

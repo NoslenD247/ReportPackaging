@@ -1,0 +1,186 @@
+@page "/cutting-scan"
+@using ReportPackaging.Data.Sew.DTO
+@using ReportPackaging.Data.Sew.IService
+@using System.Text.Json
+@inject ISew_CuttingStatusService CuttingStatusService
+
+<div style="padding:20px; font-family:sans-serif; max-width:900px; margin:0 auto;">
+
+    <h3 style="margin-bottom:20px;">QR Cutting Status</h3>
+
+    @if (_toastVisible)
+    {
+        <div style="position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+                    background:@(_toastSuccess ? "#2e7d32" : "#c62828"); color:white;
+                    padding:14px 28px; border-radius:10px; font-size:15px; font-weight:600;
+                    box-shadow:0 4px 16px rgba(0,0,0,0.25); z-index:9999; white-space:nowrap;">
+            @_toastMessage
+        </div>
+    }
+
+    <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:16px; margin-bottom:24px;">
+        <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px;">
+            Escanear QR
+        </label>
+        <input type="text"
+               value="@_qrInput"
+               @oninput="OnQrInput"
+               placeholder="Apunta el escáner aquí..."
+               style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px;
+                      font-size:14px; box-sizing:border-box; outline:none;"
+               disabled="@_scanning" />
+        @if (_scanning)
+        {
+            <div style="font-size:12px; color:#6b7280; margin-top:6px;">Procesando...</div>
+        }
+    </div>
+
+    <h4 style="margin-bottom:12px; color:#374151;">Escaneados hoy</h4>
+
+    @if (_loading)
+    {
+        <div style="color:#6b7280; font-size:14px;">Cargando...</div>
+    }
+    else if (!_records.Any())
+    {
+        <div style="color:#9ca3af; font-size:14px;">Sin registros por hoy.</div>
+    }
+    else
+    {
+        <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                <thead>
+                    <tr style="background:#f3f4f6; color:#374151;">
+                        <th style="@_th">IdCutting</th>
+                        <th style="@_th">FileNo</th>
+                        <th style="@_th">Talla</th>
+                        <th style="@_th">Cant.</th>
+                        <th style="@_th">No. Paq.</th>
+                        <th style="@_th">Actualizado</th>
+                        <th style="@_th">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in _records)
+                    {
+                        <tr style="border-bottom:1px solid #e5e7eb;">
+                            <td style="@_td">@r.IdCutting</td>
+                            <td style="@_td">@r.FileNo</td>
+                            <td style="@_td">@r.SizeName</td>
+                            <td style="@_td">@r.Quantity</td>
+                            <td style="@_td">@r.PackageNo</td>
+                            <td style="@_td">@r.Updated_at.ToString("HH:mm:ss")</td>
+                            <td style="@_td">
+                                <button @onclick="() => Revert(r.IdCutting)"
+                                        style="background:#ef4444; color:white; border:none; border-radius:6px;
+                                               padding:5px 12px; font-size:12px; cursor:pointer;">
+                                    Revertir
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private const int CenterId = 26;
+
+    private string _qrInput = string.Empty;
+    private bool _scanning = false;
+    private bool _loading = false;
+
+    private List<Sew_CuttingStatusDTO> _records = new();
+
+    private bool _toastVisible = false;
+    private bool _toastSuccess = true;
+    private string _toastMessage = string.Empty;
+
+    private const string _th = "padding:8px 12px; text-align:left; font-weight:600; white-space:nowrap;";
+    private const string _td = "padding:8px 12px; white-space:nowrap;";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadToday();
+    }
+
+    private async Task LoadToday()
+    {
+        _loading = true;
+        var result = await CuttingStatusService.GetTodayAsync(CenterId);
+        _records = result.ToList();
+        _loading = false;
+    }
+
+    private async Task OnQrInput(ChangeEventArgs e)
+    {
+        _qrInput = e.Value?.ToString() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(_qrInput) || _scanning)
+            return;
+
+        Sew_CuttingStatusScanDTO? dto;
+        try
+        {
+            dto = JsonSerializer.Deserialize<Sew_CuttingStatusScanDTO>(_qrInput,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch
+        {
+            dto = null;
+        }
+
+        if (dto == null || dto.ID == 0)
+            return;
+
+        _scanning = true;
+        StateHasChanged();
+
+        var success = await CuttingStatusService.ScanAsync(dto);
+
+        _qrInput = string.Empty;
+        _scanning = false;
+
+        if (success)
+        {
+            await LoadToday();
+            ShowToast(true, "Escaneado correctamente");
+        }
+        else
+        {
+            ShowToast(false, "Error al escanear");
+        }
+    }
+
+    private async Task Revert(int idCutting)
+    {
+        var success = await CuttingStatusService.RevertAsync(idCutting);
+        if (success)
+        {
+            await LoadToday();
+            ShowToast(true, "Revertido correctamente");
+        }
+        else
+        {
+            ShowToast(false, "Error al revertir");
+        }
+    }
+
+    private void ShowToast(bool success, string message)
+    {
+        _toastSuccess = success;
+        _toastMessage = success ? $"✅ {message}" : $"❌ {message}";
+        _toastVisible = true;
+        StateHasChanged();
+        _ = HideToastAfterDelay();
+    }
+
+    private async Task HideToastAfterDelay()
+    {
+        await Task.Delay(3000);
+        _toastVisible = false;
+        StateHasChanged();
+    }
+}

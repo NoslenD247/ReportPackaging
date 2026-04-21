@@ -18,6 +18,16 @@
 
 <div style="padding: 20px; font-family: sans-serif; max-width: 100%;">
 
+    @if (_mostrarToast)
+    {
+        <div style="position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+                    background:#2e7d32; color:white; padding:14px 28px; border-radius:10px;
+                    font-size:15px; font-weight:600; box-shadow:0 4px 16px rgba(0,0,0,0.25);
+                    z-index:9999; white-space:nowrap;">
+            ✅ Guardado correctamente
+        </div>
+    }
+
     <h3>📦 Envío de Mercaderías</h3>
 
     @if (templateSeleccionado == 0)
@@ -112,14 +122,20 @@
                 <div class="card-body p-3">
                     <div class="flex-container">
                         <SfTextBox Placeholder="No. Envío" FloatLabelType="FloatLabelType.Always" CssClass="e-outline" @bind-Value="noEnvio" />
-                        <div>
+                       @*  <div>
                             <label style="font-size:11px; color:#666; display:block; margin-bottom:4px;">Entry Date (Día / Mes / Año)</label>
                             <div style="display:flex; gap:4px;">
                                 <SfTextBox Placeholder="DD" CssClass="e-outline" @bind-Value="shippingData.Dia" Width="55px" />
                                 <SfTextBox Placeholder="MM" CssClass="e-outline" @bind-Value="shippingData.Mes" Width="55px" />
                                 <SfTextBox Placeholder="AAAA" CssClass="e-outline" @bind-Value="shippingData.Ano" Width="75px" />
                             </div>
-                        </div>
+                        </div> *@
+                        <SfDatePicker TValue="DateTime"
+                                      Placeholder="Entry Date"
+                                      FloatLabelType="FloatLabelType.Always"
+                                      CssClass="e-outline"
+                                      @bind-Value="entryDate"
+                                      Format="dd/MM/yyyy" />
                         <SfDropDownList DataSource="@buyers" TItem="BuyerDTO" TValue="int"
                                         Placeholder="Buyer" AllowFiltering="true"
                                         FloatLabelType="FloatLabelType.Always" CssClass="e-outline"
@@ -213,6 +229,7 @@
     private bool   isGuardando          = false;
     private bool   isBody               = true;
     private bool   mostrarPreview       = false;
+    private bool   _mostrarToast        = false;
     private string errorMessage         = string.Empty;
     private string mensajeGuardado      = string.Empty;
     private string noEnvio              = string.Empty;
@@ -223,6 +240,8 @@
     private string? capturedImageContentType  = null;
     private string? capturedImageFileName     = null;
     private string? capturedImageBase64       = null;
+    private DateTime entryDate = DateTime.Now;
+
 
     private int selectedBuyerId    = 0;
     private int selectedSupplierId = 0;
@@ -253,11 +272,9 @@
 
     private async Task CargarListas()
     {
-        currentUser = (await SewGetDataFromUserService.GetAllAsync(_email)).FirstOrDefault();
-        Console.WriteLine($"Id:{currentUser.ID} | UserName:{currentUser.UserName} | Email:{currentUser.Email} | NameEn:{currentUser.NameEn} | CenterId:{currentUser.CenterId}");
-
-        buyers = (await FactoryService.GetBuyersByCenter(currentUser.CenterId)).ToList();
-        suppliers = (await FactoryService.GetSuppliersByCenter(currentUser.CenterId)).ToList();
+        int centerId = Preferences.Get("user_center_id", 0);
+        buyers    = (await FactoryService.GetBuyersByCenter(centerId)).ToList();
+        suppliers = (await FactoryService.GetSuppliersByCenter(centerId)).ToList();
     }
 
 
@@ -325,36 +342,45 @@
             imageUrl = null; capturedImageBase64 = null; mostrarPreview = false;
             isLoading = true; StateHasChanged();
 
-            AppSettingsLoader.Load();
             var endpoint = AppSettings.Current.AzureComputerVision.Endpoint;
             var apiKey   = AppSettings.Current.AzureComputerVision.Key;
 
             if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(apiKey))
             { errorMessage = "No se encontró el Endpoint o Key de Azure en appsettings.json."; return; }
 
-            using var stream = await photo.OpenReadAsync();
-            using var memoryStream = new MemoryStream();
-            await stream.CopyToAsync(memoryStream);
-            memoryStream.Position = 0;
-
-            capturedImageStream?.Dispose();
-            capturedImageStream = new MemoryStream();
-            await memoryStream.CopyToAsync(capturedImageStream);
-            capturedImageStream.Position = 0;
-            memoryStream.Position = 0;
+            // Lee la imagen una sola vez en memoria
+            using var rawStream = await photo.OpenReadAsync();
+            var imageBytes = new byte[rawStream.Length];
+            await rawStream.ReadExactlyAsync(imageBytes);
 
             capturedImageContentType = photo.ContentType ?? "image/jpeg";
             capturedImageFileName    = photo.FileName;
-            capturedImageBase64      = Convert.ToBase64String(capturedImageStream.ToArray());
+            capturedImageBase64      = Convert.ToBase64String(imageBytes);
+
+            // Guarda original para upload posterior
+            capturedImageStream?.Dispose();
+            capturedImageStream = new MemoryStream(imageBytes);
+
+            // Comprime antes de enviar a Azure (reduce tiempo de OCR)
+            using var ocrStream = CompressForOcr(imageBytes);
 
             shippingData = templateSeleccionado switch
             {
-                1 => await new AzureShippingService(endpoint, apiKey).AnalyzeShippingAsync(memoryStream),
-                2 => await new AzureShippingServiceCR(endpoint, apiKey).AnalyzeShippingAsync(memoryStream),
-                3 => await new AzureShippingServiceAL(endpoint, apiKey).AnalyzeShippingAsync(memoryStream),
+                1 => await new AzureShippingService(endpoint, apiKey).AnalyzeShippingAsync(ocrStream),
+                2 => await new AzureShippingServiceCR(endpoint, apiKey).AnalyzeShippingAsync(ocrStream),
+                3 => await new AzureShippingServiceAL(endpoint, apiKey).AnalyzeShippingAsync(ocrStream),
                 _ => throw new Exception("Template no seleccionado.")
             };
+
             AutoSeleccionarListas();
+
+            if (int.TryParse(shippingData?.Dia, out int dia) &&
+                int.TryParse(shippingData?.Mes, out int mes) &&
+                int.TryParse(shippingData?.Ano, out int ano) &&
+                ano >= 2000)
+                entryDate = new DateTime(ano, mes, dia);
+            else
+                entryDate = DateTime.Now;
         }
         catch (Exception ex)
         {
@@ -362,6 +388,29 @@
             System.Diagnostics.Debug.WriteLine($"[ShippingCapture] {ex}");
         }
         finally { isLoading = false; StateHasChanged(); }
+    }
+
+    private static MemoryStream CompressForOcr(byte[] imageBytes)
+    {
+        using var input = new MemoryStream(imageBytes);
+        using var image = Microsoft.Maui.Graphics.Platform.PlatformImage.FromStream(input);
+
+        const float maxDim = 1600f;
+        var output = new MemoryStream();
+
+        if (image.Width > maxDim || image.Height > maxDim)
+        {
+            using var resized = image.Downsize(maxDim);
+            resized.Save(output, Microsoft.Maui.Graphics.ImageFormat.Jpeg, 0.85f);
+        }
+        else
+        {
+            image.Save(output, Microsoft.Maui.Graphics.ImageFormat.Jpeg, 0.85f);
+        }
+
+        output.Position = 0;
+        System.Diagnostics.Debug.WriteLine($"[OCR] Imagen: {imageBytes.Length / 1024}KB → {output.Length / 1024}KB");
+        return output;
     }
 
     private async Task GuardarDatos()
@@ -382,11 +431,11 @@
                 System.Diagnostics.Debug.WriteLine($"[ShippingCapture] Imagen subida: {imageUrl}");
             }
 
-            DateTime entryDate = DateTime.Now;
-            if (int.TryParse(shippingData.Dia, out int dia) &&
-                int.TryParse(shippingData.Mes, out int mes) &&
-                int.TryParse(shippingData.Ano, out int ano))
-                entryDate = new DateTime(ano, mes, dia);
+            // DateTime entryDate = DateTime.Now;
+            // if (int.TryParse(shippingData.Dia, out int dia) &&
+            //     int.TryParse(shippingData.Mes, out int mes) &&
+            //     int.TryParse(shippingData.Ano, out int ano))
+            //     entryDate = new DateTime(ano, mes, dia);
 
             decimal bodyReceived = isBody ? shippingData.TotalYards : 0;
             decimal ribReceived  = isBody ? 0 : shippingData.TotalYards;
@@ -412,16 +461,52 @@
                 ImageUrl                = imageUrl                ?? string.Empty,
                 CreatedDate             = DateTime.Now,
                 LastUpdatedDate         = DateTime.Now,
-                CreatedByUserName       = currentUser.UserName,
-                LastUpdatedByUserId     = currentUser.ID,
-                LastUpdatedByUserNameEn = currentUser.NameEn,
-                CenterId                = currentUser.CenterId
+                CreatedByUserName       = Preferences.Get("user_username",  string.Empty),
+                LastUpdatedByUserId     = Preferences.Get("user_id",        string.Empty),
+                LastUpdatedByUserNameEn = Preferences.Get("user_name_en",   string.Empty),
+                CenterId                = Preferences.Get("user_center_id", 0)
             };
 
             var ok = await FabricInboundScanService.CreateFabricInboundScan(dto);
-            mensajeGuardado = ok ? "Documento guardado correctamente." : "⚠️ Error al guardar. Revisa tu conexión.";
+            if (ok)
+            {
+                LimpiarFormulario();
+                _ = MostrarToast();
+            }
+            else
+            {
+                mensajeGuardado = "⚠️ Error al guardar. Revisa tu conexión.";
+            }
         }
         catch (Exception ex) { errorMessage = $"Error al guardar: {ex.Message}"; }
         finally { isGuardando = false; StateHasChanged(); }
+    }
+
+    private void LimpiarFormulario()
+    {
+        capturedImageStream?.Dispose();
+        capturedImageStream      = null;
+        capturedImageBase64      = null;
+        capturedImageFileName    = null;
+        capturedImageContentType = null;
+        shippingData             = null;
+        imageUrl                 = null;
+        noEnvio                  = string.Empty;
+        selectedBuyerId          = 0;
+        selectedSupplierId       = 0;
+        isBody                   = true;
+        mostrarPreview           = false;
+        entryDate                = DateTime.Now;
+        errorMessage             = string.Empty;
+        mensajeGuardado          = string.Empty;
+    }
+
+    private async Task MostrarToast()
+    {
+        _mostrarToast = true;
+        StateHasChanged();
+        await Task.Delay(3000);
+        _mostrarToast = false;
+        StateHasChanged();
     }
 }

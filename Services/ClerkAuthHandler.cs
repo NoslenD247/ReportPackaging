@@ -7,7 +7,9 @@ namespace ReportPackaging.Services
         protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            var token = await SecureStorage.GetAsync("clerk_JWT");
+            var loginType = await SecureStorage.GetAsync("login_type");
+            var tokenKey  = loginType == "azure" ? "azure_JWT" : "clerk_JWT";
+            var token     = await SecureStorage.GetAsync(tokenKey);
 
             if (!string.IsNullOrEmpty(token))
                 request.Headers.Authorization =
